@@ -60,10 +60,11 @@
             </div>
             
             <!-- API Key 設定 -->
-            <div class="flex items-center gap-2 bg-indigo-700/60 p-2 rounded-lg border border-indigo-500/40">
-                <i data-lucide="key" class="w-4 h-4 text-indigo-300"></i>
-                <input type="password" id="apiKeyInput" placeholder="Gemini API Key (任意)" class="bg-indigo-900/50 text-white text-xs px-2 py-1 rounded border border-indigo-400/30 focus:outline-none focus:border-white w-40 sm:w-48 placeholder-indigo-300/60">
-                <button id="saveApiKeyBtn" class="bg-indigo-500 hover:bg-indigo-400 text-xs px-2 py-1 rounded font-medium transition">保存</button>
+            <div class="flex items-center gap-2">
+                <button type="button" id="openApiKeyModalBtn" class="flex items-center gap-1.5 bg-indigo-700/80 hover:bg-indigo-500 text-xs px-3 py-1.5 rounded-lg border border-indigo-400/40 transition font-medium shadow-xs">
+                    <i data-lucide="key" class="w-3.5 h-3.5 text-indigo-300"></i>
+                    <span id="headerApiKeyStatus">Gemini API 設定</span>
+                </button>
             </div>
         </div>
     </header>
@@ -93,11 +94,20 @@
                     <form id="generatorForm" class="space-y-4">
                         <!-- 検索キーワード -->
                         <div>
-                            <label for="keyword" class="block text-xs font-semibold text-slate-700 mb-1">
-                                検索項目（語彙・文法）<span class="text-rose-500">*</span>
-                            </label>
-                            <input type="text" id="keyword" required placeholder="例: 〜ないほうがいいです, 検討する, 思わず" value="〜ないほうがいいです" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
-                            <p class="text-[11px] text-slate-400 mt-1">複数の場合はカンマで区切ってください</p>
+                            <div class="flex items-center justify-between mb-1">
+                                <label for="keyword" class="block text-xs font-semibold text-slate-700">
+                                    検索項目（語彙・文法）<span class="text-rose-500">*</span>
+                                </label>
+                            </div>
+                            <input type="text" id="keyword" required placeholder="例: 身近, 〜ないほうがいいです, 検討する" value="身近" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
+                            
+                            <!-- プリセットチップ -->
+                            <div class="flex items-center gap-1.5 pt-2 flex-wrap text-[11px]">
+                                <span class="text-slate-400">例を試す:</span>
+                                <button type="button" class="preset-chip bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-200 transition" data-word="身近" data-level="N3" data-context="日常生活・学校生活">身近 (N3)</button>
+                                <button type="button" class="preset-chip bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-200 transition" data-word="〜ないほうがいいです" data-level="N4" data-context="日常生活・学校生活">〜ないほうがいい (N4)</button>
+                                <button type="button" class="preset-chip bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-200 transition" data-word="検討する" data-level="N2" data-context="ビジネス・社会">検討する (N2)</button>
+                            </div>
                         </div>
 
                         <!-- JLPT レベル選択 -->
@@ -232,10 +242,32 @@
                         </div>
 
                         <!-- ローディング表示 -->
-                        <div id="loadingState" class="hidden my-auto py-12 text-center">
-                            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-600 border-t-transparent mb-3"></div>
-                            <p class="text-sm font-medium text-slate-700">学習者のレベルに合わせて例文と問題を生成中...</p>
-                            <p class="text-xs text-slate-400 mt-1">適切な語彙・文法表現を選択しています</p>
+                        <div id="loadingState" class="hidden my-auto py-12 text-center space-y-3">
+                            <div class="inline-block animate-spin rounded-full h-9 w-9 border-4 border-indigo-600 border-t-transparent"></div>
+                            <div>
+                                <p class="text-sm font-bold text-slate-800" id="loadingTitle">Gemini AI で例文とテストを生成中...</p>
+                                <p class="text-xs text-slate-500 mt-1" id="loadingSubtitle">対象語句・レベル・使用シーンに合わせた自然な文脈を構築しています</p>
+                            </div>
+                        </div>
+
+                        <!-- エラー表示エリア -->
+                        <div id="errorState" class="hidden my-auto py-10 px-4 text-center max-w-md mx-auto space-y-4">
+                            <div class="inline-flex p-3 bg-rose-50 text-rose-500 rounded-full">
+                                <i data-lucide="alert-triangle" class="w-8 h-8"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-bold text-slate-800" id="errorTitle">Gemini AI による生成エラー</h3>
+                                <p class="text-xs text-rose-600 mt-1.5 leading-relaxed font-mono bg-rose-50 p-2.5 rounded-lg border border-rose-200 text-left" id="errorMessage">エラー内容</p>
+                            </div>
+                            <div class="flex items-center justify-center gap-2 pt-1">
+                                <button type="button" id="errorOpenKeyBtn" class="px-3.5 py-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm transition flex items-center gap-1.5">
+                                    <i data-lucide="key" class="w-3.5 h-3.5"></i>
+                                    <span>APIキーを設定・確認する</span>
+                                </button>
+                                <button type="button" id="errorRetryBtn" class="px-3.5 py-2 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg border border-slate-200 transition">
+                                    再試行
+                                </button>
+                            </div>
                         </div>
 
                         <!-- タブ1: 例文表示コンテンツ -->
@@ -297,6 +329,64 @@
         <div id="printAnswersList" class="space-y-5 text-xs"></div>
     </div>
 
+    <!-- Gemini APIキー設定モーダル -->
+    <div id="apiKeyModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-slate-200 space-y-4">
+            <div class="flex items-start justify-between">
+                <div class="flex items-center gap-2.5 text-indigo-600">
+                    <div class="p-2.5 bg-indigo-50 rounded-xl">
+                        <i data-lucide="sparkles" class="w-5 h-5 text-indigo-600"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-base">Gemini API キーの設定</h3>
+                        <p class="text-xs text-slate-500">語句の品詞・レベル・文脈に応じた自然な例文をAI生成します</p>
+                    </div>
+                </div>
+                <button type="button" id="closeApiKeyModalBtn" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-900 space-y-1.5">
+                <p class="font-bold flex items-center gap-1.5 text-amber-800">
+                    <i data-lucide="info" class="w-4 h-4 text-amber-600 flex-shrink-0"></i>
+                    語句の品詞と文脈に応じた例文生成について
+                </p>
+                <p class="text-[11px] leading-relaxed text-amber-800">
+                    「身近」などの任意の語句を機械的な定型文に置換するのではなく、語句本来の品詞（な形容詞・名詞）や文脈（日常生活・学校・ビジネス等）に合わせた自然な例文と確認テストを生成するためにGemini APIを使用します。
+                </p>
+            </div>
+
+            <div class="space-y-2">
+                <label for="modalApiKeyInput" class="block text-xs font-semibold text-slate-700">
+                    Gemini API Key
+                </label>
+                <div class="relative">
+                    <input type="password" id="modalApiKeyInput" placeholder="AIzaSy..." class="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none pr-10 font-mono">
+                    <button type="button" id="toggleApiKeyVisibilityBtn" class="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-1">
+                        <i data-lucide="eye" class="w-4 h-4" id="eyeIcon"></i>
+                    </button>
+                </div>
+                <div class="text-[11px] text-slate-500 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 pt-1">
+                    <span>キーはお使いのブラウザ内（localStorage）に安全に保存されます。</span>
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline font-medium inline-flex items-center gap-1">
+                        無料でAPIキーを取得 <i data-lucide="external-link" class="w-3 h-3"></i>
+                    </a>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button type="button" id="cancelApiKeyBtn" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition">
+                    閉じる
+                </button>
+                <button type="button" id="saveAndGenerateModalBtn" class="px-4 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition flex items-center gap-1.5">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                    <span>保存して例文を生成する</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- フッター (印刷非表示) -->
     <footer class="bg-slate-100 border-t border-slate-200 mt-auto py-4 text-center text-xs text-slate-500 no-print">
         <p>© 日本語教育教材サポートツール - JLPT Level Compliant Generator</p>
@@ -310,551 +400,138 @@
         let isFuriganaVisible = true;
         let currentTab = 'sentences'; // 'sentences' or 'quiz'
 
-        // ---- フォールバック用サンプルデータ & 動的生成器 ----
-        function generateDynamicContent(rawKeyword, level, context, count) {
-            const kw = (rawKeyword || '〜ないほうがいいです').trim();
-            const clean = kw.replace(/^[〜~～\s]+/, '').trim();
-
-            // パターン1: 〜ないほうがいい
-            if (clean.includes('ないほうがいい') || clean.includes('ない方がいい')) {
-                return {
-                    examples: [
-                        {
-                            japanese: "熱(ねつ)があるときは、お風呂(ふろ)に入(はい)らないほうがいいですよ。",
-                            english: "You shouldn't take a bath when you have a fever.",
-                            teacherNote: "「〜ないほうがいい」は動詞のナイ形に接続します。強い助言・忠告になるため、目上の人へ直接使うのは避ける配慮も指導します。"
-                        },
-                        {
-                            japanese: "暗(くら)い部屋(へや)で本(ほん)を読(よ)まないほうがいいです。目(め)が悪(わる)くなります。",
-                            english: "You'd better not read books in a dark room. It will hurt your eyes.",
-                            teacherNote: "理由（〜が悪くなります）と一緒に提示することで、日常会話で自然に相手へ助言する練習ができます。"
-                        },
-                        {
-                            japanese: "明日(あした)は朝(あさ)早(はや)いですから、今夜(こんや)は夜更(よふ)かしをしないほうがいいです。",
-                            english: "Since tomorrow is an early morning, you shouldn't stay up late tonight.",
-                            teacherNote: "サ変動詞「する」のナイ形「しない」への接続を確認し、肯定「〜たほうがいい」との混同を防ぎます。"
-                        },
-                        {
-                            japanese: "甘(あま)いものをたくさん食(た)べないほうがいいですよ。虫歯(むしば)になります。",
-                            english: "You'd better not eat too many sweets. You'll get cavities.",
-                            teacherNote: "「食べる」→「食べない」のグループ2動詞のナイ形活用を確認します。"
-                        },
-                        {
-                            japanese: "体調(たいちょう)が悪(わる)いときは、無理(むり)をして働(はたら)かないほうがいいです。",
-                            english: "When you are not feeling well, it is better not to overwork.",
-                            teacherNote: "「働く」→「働かない」のグループ1動詞のナイ形活用（カ行五段）の定着を図ります。"
-                        }
-                    ].slice(0, count),
-                    quizzes: [
-                        {
-                            question: "お腹(なか)が痛(いた)いですから、冷(つめ)たいものを （　　） ほうがいいです。",
-                            options: ["1. 飲まない", "2. 飲んだ", "3. 飲まなくて", "4. 飲みません"],
-                            answer: 0,
-                            explanation: "否定の忠告「〜ないほうがいい」は動詞のナイ形に接続するため「飲まない」が正解です。「飲んだ」だと肯定の意味になります。"
-                        },
-                        {
-                            question: "明日(あした)は試験(しけん)ですから、学校(がっこう)に遅(おく)れ （　　） ほうがいいですよ。",
-                            options: ["1. ない", "2. ないの", "3. ないで", "4. なかった"],
-                            answer: 0,
-                            explanation: "動詞ナイ形「遅れない」＋「ほうがいい」の接続です。「ないで」は「〜ないでください」との混同誤用です。"
-                        },
-                        {
-                            question: "風邪(かぜ)をひいたときは、無理(むり)を （　　） ほうがいいです。",
-                            options: ["1. しない", "2. して", "3. しなかった", "4. する"],
-                            answer: 0,
-                            explanation: "動詞「する」のナイ形は「しない」なので「しないほうがいい」が適切です。"
-                        },
-                        {
-                            question: "夜(よる)遅(おそ)くに コーヒーを （　　） ほうがいいですよ。眠(ねむ)れなくなります。",
-                            options: ["1. 飲まない", "2. 飲む", "3. 飲んで", "4. 飲まなかった"],
-                            answer: 0,
-                            explanation: "助言の否定形は動詞ナイ形＋「ほうがいい」です。"
-                        },
-                        {
-                            question: "危(あぶ)ないですから、一人(ひとり)で 川(かわ)に （　　） ほうがいいです。",
-                            options: ["1. 行かない", "2. 行った", "3. 行かなくて", "4. 行きません"],
-                            answer: 0,
-                            explanation: "否定のアドバイス「行かないほうがいい」の形にします。"
-                        }
-                    ].slice(0, count)
-                };
-            }
-
-            // パターン2: 〜たほうがいい
-            if (clean.includes('たほうがいい') || clean.includes('た方がいい')) {
-                return {
-                    examples: [
-                        {
-                            japanese: "風邪(かぜ)のときは、早(はや)く寝(ね)たほうがいいですよ。",
-                            english: "You should go to bed early when you have a cold.",
-                            teacherNote: "動詞のタ形に接続し、相手に特定の行動を勧める表現です。"
-                        },
-                        {
-                            japanese: "わからない言葉(ことば)は、辞書(じしょ)で調(しら)べたほうがいいです。",
-                            english: "You had better look up words you don't understand in a dictionary.",
-                            teacherNote: "グループ2動詞「調べる」のタ形「調べた」への接続を確認します。"
-                        },
-                        {
-                            japanese: "旅行(りょこう)の前(まえ)に、ホテルを予約(よやく)したほうがいいです。",
-                            english: "You should reserve a hotel before traveling.",
-                            teacherNote: "「する」のタ形「した」を用いた事前準備へのアドバイスです。"
-                        }
-                    ].slice(0, count),
-                    quizzes: [
-                        {
-                            question: "熱(ねつ)がありますから、今日(きょう)は 病院(びょういん)へ （　　） ほうがいいですよ。",
-                            options: ["1. 行った", "2. 行く", "3. 行って", "4. 行かない"],
-                            answer: 0,
-                            explanation: "肯定の忠告・助言「〜たほうがいい」は動詞のタ形に接続するため「行った」が正解です。"
-                        },
-                        {
-                            question: "パスポートは 大切(たいせつ)ですから、コピーを （　　） ほうがいいです。",
-                            options: ["1. とった", "2. とる", "3. とって", "4. とりたい"],
-                            answer: 0,
-                            explanation: "「とる」のタ形は「とった」です。「とったほうがいい」が正しい形です。"
-                        },
-                        {
-                            question: "疲(つか)れたときは、ゆっくり休(やす) （　　） ほうがいいです。",
-                            options: ["1. んだ", "2. む", "3. んで", "4. ない"],
-                            answer: 0,
-                            explanation: "「休む」のタ形は撥音便で「休んだ」となります。"
-                        }
-                    ].slice(0, count)
-                };
-            }
-
-            // パターン3: 〜ないでください
-            if (clean.includes('ないでください')) {
-                return {
-                    examples: [
-                        {
-                            japanese: "ここで写真(しゃしん)を撮(と)らないでください。",
-                            english: "Please do not take pictures here.",
-                            teacherNote: "指示・依頼の否定表現です。「〜てはいけません（禁止）」より柔らかい依頼となります。"
-                        },
-                        {
-                            japanese: "授業中(じゅぎょうちゅう)に携帯電話(けいたいでんわ)を使(つか)わないでください。",
-                            english: "Please do not use cell phones during class.",
-                            teacherNote: "教室や公共の場での指示として導入しやすい文脈です。"
-                        },
-                        {
-                            japanese: "テストのとき、隣(となり)の人(ひと)と話(はな)さないでください。",
-                            english: "Please do not talk to the person next to you during the test.",
-                            teacherNote: "グループ1動詞「話す」→「話さない」のナイ形活用を確認します。"
-                        }
-                    ].slice(0, count),
-                    quizzes: [
-                        {
-                            question: "図書館(としょかん)で 大(おお)きな声(こえ)で （　　） ください。",
-                            options: ["1. 話さないで", "2. 話さない", "3. 話さなくて", "4. 話しません"],
-                            answer: 0,
-                            explanation: "「〜ないでください」は動詞のナイ形に「でください」が付きます。"
-                        },
-                        {
-                            question: "危(あぶ)ないですから、そこに入(はい) （　　） ください。",
-                            options: ["1. らないで", "2. らない", "3. りません", "4. るないで"],
-                            answer: 0,
-                            explanation: "「入る」は五段動詞なのでナイ形は「入らない」＋「でください」となります。"
-                        },
-                        {
-                            question: "このドアを （　　） ください。",
-                            options: ["1. 開けないで", "2. 開かないで", "3. 開けなくて", "4. 開けません"],
-                            answer: 0,
-                            explanation: "他動詞「開ける」のナイ形「開けない」＋「でください」が正解です。"
-                        }
-                    ].slice(0, count)
-                };
-            }
-
-            // パターン4: 〜ことができる / ことができます
-            if (clean.includes('ことができる') || clean.includes('ことができます')) {
-                return {
-                    examples: [
-                        {
-                            japanese: "私(わたし)は日本語(にほんご)で手紙(てがみ)を書(か)くことができます。",
-                            english: "I can write letters in Japanese.",
-                            teacherNote: "能力を表す「動詞辞書形＋ことができる」の基本用法です。"
-                        },
-                        {
-                            japanese: "このコンビニでは24時間(じかん)お金(かね)をおろすことができます。",
-                            english: "You can withdraw money 24 hours a day at this convenience store.",
-                            teacherNote: "状況可能（設備や環境によって可能なこと）を表す文脈です。"
-                        },
-                        {
-                            japanese: "市役所(しやくしょ)で外国人(がいこくじん)登録(とうろく)の手続(てつづ)きをすることができます。",
-                            english: "You can register as a foreign resident at the city hall.",
-                            teacherNote: "「する」＋「ことができます」の接続を確認します。"
-                        }
-                    ].slice(0, count),
-                    quizzes: [
-                        {
-                            question: "あの店(みせ)では クレジットカードを （　　） ことができます。",
-                            options: ["1. 使う", "2. 使って", "3. 使った", "4. 使います"],
-                            answer: 0,
-                            explanation: "「〜ことができる」の直前は動詞の辞書形（使う）が接続します。"
-                        },
-                        {
-                            question: "田中(たなか)さんは ピアノを 弾(ひ)く （　　） ができます。",
-                            options: ["1. こと", "2. もの", "3. とき", "4. の"],
-                            answer: 0,
-                            explanation: "動詞を名詞化する形式名詞「こと」が入ります。"
-                        },
-                        {
-                            question: "ここから 富士山(ふじさん)を （　　） ことができます。",
-                            options: ["1. 見る", "2. 見て", "3. 見た", "4. 見ます"],
-                            answer: 0,
-                            explanation: "辞書形「見る」＋「ことができます」となります。"
-                        }
-                    ].slice(0, count)
-                };
-            }
-
-            // パターン5: 〜なければならない / 〜なくてはいけない
-            if (clean.includes('なければならない') || clean.includes('なくてはいけない') || clean.includes('なければ')) {
-                return {
-                    examples: [
-                        {
-                            japanese: "明日(あした)までに宿題(しゅくだい)を出(だ)さなければなりません。",
-                            english: "I have to submit my homework by tomorrow.",
-                            teacherNote: "義務・必然性を表す「〜なければならない」です。ナイ形「出さない」→「出さなければ」の変形を丁寧に確認します。"
-                        },
-                        {
-                            japanese: "日本(にほん)では車(くるま)を運転(うんてん)するとき、シートベルトを締(し)めなければなりません。",
-                            english: "In Japan, you must wear a seatbelt when driving a car.",
-                            teacherNote: "法律や社会規則に基づく義務を表す典型的な文脈です。"
-                        },
-                        {
-                            japanese: "健康(けんこう)のために、野菜(やさい)をもっと食(た)べなければいけません。",
-                            english: "For your health, you must eat more vegetables.",
-                            teacherNote: "「〜なくてはいけない」との言い換えもあわせて紹介します。"
-                        }
-                    ].slice(0, count),
-                    quizzes: [
-                        {
-                            question: "病院(びょういん)で 保険証(ほけんしょう)を （　　） なければなりません。",
-                            options: ["1. 見せ", "2. 見せて", "3. 見せる", "4. 見せた"],
-                            answer: 0,
-                            explanation: "「見せる」のナイ形語幹「見せない」から「見せなければなりません」となります。"
-                        },
-                        {
-                            question: "図書館(としょかん)の本(ほん)は 来週(らいしゅう)までに （　　） なければいけません。",
-                            options: ["1. 返さ", "2. 返す", "3. 返して", "4. 返し"],
-                            answer: 0,
-                            explanation: "「返す」のナイ形「返さない」→「返さなければ」が正解です。"
-                        },
-                        {
-                            question: "薬(くすり)を 毎日(まいにち) （　　） なければなりません。",
-                            options: ["1. 飲ま", "2. 飲む", "3. 飲んで", "4. 飲み"],
-                            answer: 0,
-                            explanation: "「飲む」のナイ形「飲まない」→「飲まなければ」となります。"
-                        }
-                    ].slice(0, count)
-                };
-            }
-
-            // パターン6: 検討する
-            if (clean.includes('検討')) {
-                return {
-                    examples: [
-                        {
-                            japanese: "新(あたら)しい企画(きかく)について、チームで検討(けんとう)しています。",
-                            english: "We are examining the new proposal as a team.",
-                            teacherNote: "ビジネス場面で多用される「検討する」です。「考える」よりも改まった表現であることを指導します。"
-                        },
-                        {
-                            japanese: "いただいたご提案(ていあん)を社内(しゃない)で前向(まえむ)きに検討(けんとう)いたします。",
-                            english: "We will positively consider your proposal internally.",
-                            teacherNote: "ビジネスメールや商談でよく使われる定番フレーズです。"
-                        },
-                        {
-                            japanese: "予算(よさん)の都合(つごう)により、計画(けいかく)の変更(へんこう)を検討(けんとう)する必要(ひつよう)があります。",
-                            english: "Due to budget constraints, we need to consider revising the plan.",
-                            teacherNote: "「〜を検討する必要がある」の形での問題提起の用法を練習します。"
-                        }
-                    ].slice(0, count),
-                    quizzes: [
-                        {
-                            question: "会議(かいぎ)で 次(つぎ)のイベントについて （　　） することにしました。",
-                            options: ["1. 検討", "2. 復習", "3. 予習", "4. 遠慮"],
-                            answer: 0,
-                            explanation: "様々な角度から吟味・考究する意味には「検討」が最も適切です。"
-                        },
-                        {
-                            question: "その問題(もんだい)については、現在(げんざい)社内(しゃない)で （　　） 中です。",
-                            options: ["1. 検討", "2. 見当", "3. 探検", "4. 調査済"],
-                            answer: 0,
-                            explanation: "「検討中（けんとうちゅう）」はビジネスでよく使われる重要語句です。"
-                        },
-                        {
-                            question: "新(あたら)しい方針(ほうしん)を （　　） する余地(よち)があります。",
-                            options: ["1. 検討", "2. 考慮済", "3. 決定", "4. 発見"],
-                            answer: 0,
-                            explanation: "「検討する余地がある」で、まだ議論や再考の可能性があることを表します。"
-                        }
-                    ].slice(0, count)
-                };
-            }
-
-            // パターン7: 思わず
-            if (clean.includes('思わず')) {
-                return {
-                    examples: [
-                        {
-                            japanese: "あまりにもおもしろくて、思(おも)わず笑(わら)ってしまいました。",
-                            english: "It was so funny that I couldn't help laughing.",
-                            teacherNote: "副詞「思わず」は、意識や理性を超えて無意識に特定の行動をしてしまう際に用います。「〜てしまう」とよく共起します。"
-                        },
-                        {
-                            japanese: "懐(なつ)かしい音楽(おんがく)が流(なが)れてきて、思(おも)わず立(た)ち止(ど)まった。",
-                            english: "When nostalgic music played, I instinctively stopped in my tracks.",
-                            teacherNote: "感情の高まりや突発的な身体反応を表す用法です。"
-                        },
-                        {
-                            japanese: "美味しそうな匂(にお)いにつられて、思(おも)わずパンを買(か)ってしまった。",
-                            english: "Tempted by the delicious smell, I ended up buying the bread without thinking.",
-                            teacherNote: "誘惑に負けてつい衝動買いしてしまう身近な日常シチュエーションです。"
-                        }
-                    ].slice(0, count),
-                    quizzes: [
-                        {
-                            question: "映画(えいが)が とても悲(かな)しくて、 （　　） 泣(な)いてしまった。",
-                            options: ["1. 思わず", "2. 思い切り", "3. 思い出", "4. 思って"],
-                            answer: 0,
-                            explanation: "無意識に・衝動的に体が反応した様子を表す副詞「思わず」が適切です。"
-                        },
-                        {
-                            question: "転(ころ)びそうになって、 （　　） 壁(かべ)に 手(て)を ついた。",
-                            options: ["1. 思わず", "2. 決して", "3. 必ず", "4. おそらく"],
-                            answer: 0,
-                            explanation: "反射的な動作を表すため「思わず」が正解です。"
-                        },
-                        {
-                            question: "びっくりして、 （　　） 声(こえ)を あげてしまった。",
-                            options: ["1. 思わず", "2. まったく", "3. どうぞ", "4. すっかり"],
-                            answer: 0,
-                            explanation: "驚きで無意識に声が出た状況には「思わず」が適しています。"
-                        }
-                    ].slice(0, count)
-                };
-            }
-
-            // パターン8: 〜てはいけない / 〜てはだめ
-            if (clean.includes('てはいけない') || clean.includes('てはいけません') || clean.includes('てはだめ')) {
-                return {
-                    examples: [
-                        {
-                            japanese: "ここでタバコを吸(す)ってはいけません。",
-                            english: "You must not smoke here.",
-                            teacherNote: "禁止を表す文型です。「〜ないでください（依頼）」との強さの違いを明確に指導します。"
-                        },
-                        {
-                            japanese: "テスト中(ちゅう)にスマホを見(み)てはいけません。",
-                            english: "You must not look at your smartphone during the test.",
-                            teacherNote: "学校や公的な規則・ルールを示す文脈です。動詞テ形への接続を確認します。"
-                        },
-                        {
-                            japanese: "美術館(びじゅつかん)の作品(さくひん)に触(さわ)ってはいけません。",
-                            english: "You must not touch the artworks in the museum.",
-                            teacherNote: "公共施設での注意事項を伝える例文です。"
-                        }
-                    ].slice(0, count),
-                    quizzes: [
-                        {
-                            question: "危(あぶ)ないですから、道路(どうろ)で 遊(あそ) （　　） はいけません。",
-                            options: ["1. んで", "2. んだ", "3. ぶ", "4. ばない"],
-                            answer: 0,
-                            explanation: "「遊ぶ」のテ形は「遊んで」となります。「〜てはいけない」はテ形に接続します。"
-                        },
-                        {
-                            question: "夜(よる)遅(おそ)くに 大(おお)きな音(おと)を （　　） てはいけません。",
-                            options: ["1. 出し", "2. 出す", "3. 出した", "4. 出さない"],
-                            answer: 0,
-                            explanation: "「出す」のテ形「出して」に「はいけません」が接続します。"
-                        },
-                        {
-                            question: "ここにごみを （　　） はだめですよ。",
-                            options: ["1. 捨てて", "2. 捨てた", "3. 捨てる", "4. 捨てない"],
-                            answer: 0,
-                            explanation: "口語の禁止表現「〜てはだめ」もテ形に接続します。"
-                        }
-                    ].slice(0, count)
-                };
-            }
-
-            // パターン9: 〜てもいい / 〜てもいいです
-            if (clean.includes('てもいい') || clean.includes('てもかまわない')) {
-                return {
-                    examples: [
-                        {
-                            japanese: "ここで写真(しゃしん)を撮(と)ってもいいですか。",
-                            english: "May I take pictures here?",
-                            teacherNote: "許可を求める「〜てもいいですか」です。初級の最重要依頼表現の一つです。"
-                        },
-                        {
-                            japanese: "レポートは明日(あした)出(だ)してもいいですよ。",
-                            english: "You may submit the report tomorrow.",
-                            teacherNote: "相手に許可を与える用法です。"
-                        },
-                        {
-                            japanese: "体調(たいちょう)が悪(わる)いときは、早退(そうたい)してもかまいません。",
-                            english: "If you don't feel well, you may leave early.",
-                            teacherNote: "より丁寧な許可表現「〜てもかまわない」も指導します。"
-                        }
-                    ].slice(0, count),
-                    quizzes: [
-                        {
-                            question: "すみません、この席(せき)に （　　） もいいですか。",
-                            options: ["1. 座って", "2. 座った", "3. 座る", "4. 座らない"],
-                            answer: 0,
-                            explanation: "許可の「〜てもいい」は動詞テ形に接続するため「座って」が正解です。"
-                        },
-                        {
-                            question: "ペンを （　　） もいいですか。",
-                            options: ["1. 借りて", "2. 借りた", "3. 借りる", "4. 借りたい"],
-                            answer: 0,
-                            explanation: "「借りる」のテ形「借りて」＋「もいいですか」となります。"
-                        },
-                        {
-                            question: "ここでお弁当(べんとう)を （　　） もかまいません。",
-                            options: ["1. 食べても", "2. 食べた", "3. 食べる", "4. 食べ"],
-                            answer: 0,
-                            explanation: "テ形「食べて」＋「もかまいません」が正解です。"
-                        }
-                    ].slice(0, count)
-                };
-            }
-
-            // パターン10: 〜たことがある
-            if (clean.includes('たことがある') || clean.includes('たことがありません')) {
-                return {
-                    examples: [
-                        {
-                            japanese: "私(わたし)は日本(にほん)へ行(い)ったことがあります。",
-                            english: "I have been to Japan.",
-                            teacherNote: "経験を表す「動詞タ形＋ことがある」です。過去の単なる出来事との違いを意識させます。"
-                        },
-                        {
-                            japanese: "富士山(ふじさん)に登(のぼ)ったことがありますか。",
-                            english: "Have you ever climbed Mt. Fuji?",
-                            teacherNote: "相手の経験を尋ねる際の頻出表現です。"
-                        },
-                        {
-                            japanese: "まだ納豆(なっとう)を食(た)べたことがありません。",
-                            english: "I have never eaten natto yet.",
-                            teacherNote: "否定形「〜たことがない」の導入に最適です。"
-                        }
-                    ].slice(0, count),
-                    quizzes: [
-                        {
-                            question: "歌舞伎(かぶき)を （　　） ことがあります。",
-                            options: ["1. 見た", "2. 見る", "3. 見て", "4. 見ない"],
-                            answer: 0,
-                            explanation: "経験を表す文型は動詞のタ形＋「ことがある」です。"
-                        },
-                        {
-                            question: "着物(きもの)を （　　） ことがありますか。",
-                            options: ["1. 着た", "2. 着る", "3. 着て", "4. 着ます"],
-                            answer: 0,
-                            explanation: "「着る」のタ形「着た」が入ります。"
-                        },
-                        {
-                            question: "一度(いちど)も スキーを （　　） ことがありません。",
-                            options: ["1. した", "2. する", "3. して", "4. しない"],
-                            answer: 0,
-                            explanation: "「する」のタ形は「した」です。"
-                        }
-                    ].slice(0, count)
-                };
-            }
-
-            // パターン11: 〜ながら
-            if (clean.includes('ながら')) {
-                return {
-                    examples: [
-                        {
-                            japanese: "音楽(おんがく)を聴(き)きながら勉強(べんきょう)します。",
-                            english: "I study while listening to music.",
-                            teacherNote: "二つの動作を同時に行う表現です。マス形語幹＋ながらの接続と、後ろの動詞が主動作になる点を指導します。"
-                        },
-                        {
-                            japanese: "歩(ある)きながらスマホを見(み)てはいけません。",
-                            english: "You must not look at your smartphone while walking.",
-                            teacherNote: "禁止表現「〜てはいけない」と組み合わされた日常の注意表現です。"
-                        },
-                        {
-                            japanese: "お茶(ちゃ)を飲(の)みながら友達(ともだち)と楽(たの)しくおしゃべりしました。",
-                            english: "I had a pleasant chat with my friend while drinking tea.",
-                            teacherNote: "リラックスした日常会話の文脈です。"
-                        }
-                    ].slice(0, count),
-                    quizzes: [
-                        {
-                            question: "テレビを （　　） ながら ご飯(はん)を 食(た)べます。",
-                            options: ["1. 見", "2. 見る", "3. 見て", "4. 見た"],
-                            answer: 0,
-                            explanation: "「〜ながら」は動詞のマス形語幹に接続するため「見（見ます）」が正解です。"
-                        },
-                        {
-                            question: "歌(うた)を （　　） ながら 掃除(そうじ)を しました。",
-                            options: ["1. 歌い", "2. 歌う", "3. 歌って", "4. 歌った"],
-                            answer: 0,
-                            explanation: "「歌う」のマス形語幹「歌い」に「ながら」が接続します。"
-                        },
-                        {
-                            question: "働(はたら) （　　） ながら 大学(だいがく)に 通(かよ)っています。",
-                            options: ["1. き", "2. く", "3. いて", "4. いた"],
-                            answer: 0,
-                            explanation: "「働く」のマス形「働きます」から「働き」＋「ながら」となります。"
-                        }
-                    ].slice(0, count)
-                };
-            }
-
-            // 汎用フォールバック（任意のキーワードに対応）
-            return {
+        // ---- デモ用事前収録サンプル（オフライン・クイック体験用） ----
+        const DEMO_PRESETS = {
+            "身近": {
                 examples: [
                     {
-                        japanese: `毎日(まいにち)の生活(せいかつ)の中で、${clean}を正(ただ)しく使(つか)うことが大切(たいせつ)です。`,
-                        english: `It is important to use "${clean}" properly in daily life.`,
-                        teacherNote: `「${clean}」の基本的な意味と語感を導入する例文です。学習者の文脈に合わせて語形変化を確認します。`
+                        japanese: "環境(かんきょう)問題(もんだい)を、まず自分(じぶん)の身近(みぢか)なところから考(かんが)えてみましょう。",
+                        english: "Let's start thinking about environmental issues from our familiar surroundings.",
+                        teacherNote: "「身近な＋名詞」の形で、自分に近しい範囲・日常の事柄を表す連体修飾の用法です。「身近」はな形容詞（形状詞）として機能します。"
                     },
                     {
-                        japanese: `先生(せんせい)に質問(しつもん)して、${clean}の使い方(つかいかた)をしっかり復習(ふくしゅう)しましょう。`,
-                        english: `Ask your teacher and review how to use "${clean}" thoroughly.`,
-                        teacherNote: `教室や自習での実践的な活用を促す文脈です。コロケーション（よく一緒に使われる語）を指導します。`
+                        japanese: "留学生(りゅうがくせい)向(む)けに、身近(みぢか)な例(れい)を使(つか)って日本(にほん)の生活(せいかつ)ルールを説明(せつめい)した。",
+                        english: "I explained Japanese daily life rules using familiar examples for international students.",
+                        teacherNote: "「身近な例」は学校や会話でよく使われる自然なコロケーションです。単なる語句の挿入ではなく品詞に応じた接続を指導します。"
                     },
                     {
-                        japanese: `アルバイト先(さき)でも、${clean}についてのルールを守(まも)らなければなりません。`,
-                        english: `Even at your part-time job, you must follow the rules regarding "${clean}".`,
-                        teacherNote: `社会生活や職場での実践的コミュニケーションを意識した例文です。`
+                        japanese: "コンビニやスーパーは、私(わたし)たちの生活(せいかつ)にとても身近(みぢか)な存在(そんざい)です。",
+                        english: "Convenience stores and supermarkets are very familiar parts of our daily lives.",
+                        teacherNote: "「〜に身近な存在」という結びつきです。助詞「に」との共起関係を確認します。"
                     }
-                ].slice(0, count),
+                ],
                 quizzes: [
                     {
-                        question: `日本語(にほんご)の 授業(じゅぎょう)で （　${clean}　） について 勉強(べんきょう)しました。正しいものはどれですか。`,
-                        options: [`1. ${clean}`, `2. ${clean}でない`, `3. ${clean}でしたか`, `4. ${clean}そう`],
+                        question: "ごみを減(へ)らすために、まず （　　） な ことから 始(はじ)めましょう。",
+                        options: ["1. 身近", "2. 身近に", "3. 身近の", "4. 身近で"],
                         answer: 0,
-                        explanation: `文脈に最も自然に当てはまる標準形は「${clean}」です。`
+                        explanation: "後ろの「な こと」に接続する語幹として、な形容詞「身近」が入ります。"
                     },
                     {
-                        question: `日常(にちじょう)会話(かいわ)の中で （　${clean}　） を 適切(てきせつ)に 使(つか)います。`,
-                        options: [`1. ${clean}`, `2. ${clean}ない`, `3. ${clean}ます`, `4. ${clean}たら`],
+                        question: "先生(せんせい)は （　　） な 例(れい)を 出(だ)して、分(わ)かりやすく 教(おし)えてくれた。",
+                        options: ["1. 身近", "2. 身近さ", "3. 身近だ", "4. 身近と"],
                         answer: 0,
-                        explanation: `助詞「を」に接続する名詞句として「${clean}」が適切です。`
+                        explanation: "名詞「例」を連体修飾する「身近な例」の語幹「身近」が正解です。"
                     },
                     {
-                        question: `テストの ために （　${clean}　） の 意味(いみ)を 確認(かくにん)して おきましょう。`,
-                        options: [`1. ${clean}`, `2. ${clean}でした`, `3. ${clean}ず`, `4. ${clean}ば`],
+                        question: "スマートフォンは、だれにとっても （　　） な 道具(どうぐ)です。",
+                        options: ["1. 身近", "2. 身近で", "3. 身近な", "4. 身近に"],
                         answer: 0,
-                        explanation: `「の」に接続する基本形として「${clean}」が入ります。`
+                        explanation: "「（　）な 道具」の空欄に入る語幹は「身近」です。"
                     }
-                ].slice(0, count)
-            };
-        }
+                ]
+            },
+            "〜ないほうがいいです": {
+                examples: [
+                    {
+                        japanese: "熱(ねつ)があるときは、お風呂(ふろ)に入(はい)らないほうがいいですよ。",
+                        english: "You shouldn't take a bath when you have a fever.",
+                        teacherNote: "「〜ないほうがいい」は動詞のナイ形に接続します。強い助言・忠告になるため、目上の人へ直接使うのは避ける配慮も指導します。"
+                    },
+                    {
+                        japanese: "暗(くら)い部屋(へや)でスマートフォンを見(み)ないほうがいいです。目(め)が悪(わる)くなります。",
+                        english: "You'd better not look at your smartphone in a dark room. It will hurt your eyes.",
+                        teacherNote: "理由（〜が悪くなります）と一緒に提示することで、日常会話で自然に相手へ助言する練習ができます。"
+                    },
+                    {
+                        japanese: "明日(あした)は朝(あさ)早(はや)いですから、今夜(こんや)は夜更(よふ)かしをしないほうがいいです。",
+                        english: "Since tomorrow is an early morning, you shouldn't stay up late tonight.",
+                        teacherNote: "サ変動詞「する」のナイ形「しない」への接続を確認します。"
+                    }
+                ],
+                quizzes: [
+                    {
+                        question: "お腹(なか)が痛(いた)いですから、冷(つめ)たいものを （　　） ほうがいいです。",
+                        options: ["1. 飲まない", "2. 飲んだ", "3. 飲まなくて", "4. 飲みません"],
+                        answer: 0,
+                        explanation: "否定のアドバイス「〜ないほうがいい」は動詞のナイ形に接続するため「飲まない」が正解です。"
+                    },
+                    {
+                        question: "明日(あした)は試験(しけん)ですから、学校(がっこう)に遅(おく)れ （　　） ほうがいいですよ。",
+                        options: ["1. ない", "2. ないの", "3. ないで", "4. なかった"],
+                        answer: 0,
+                        explanation: "動詞ナイ形「遅れない」＋「ほうがいい」の接続です。"
+                    },
+                    {
+                        question: "風邪(かぜ)をひいたときは、無理(むり)を （　　） ほうがいいです。",
+                        options: ["1. しない", "2. して", "3. しなかった", "4. する"],
+                        answer: 0,
+                        explanation: "動詞「する」のナイ形は「しない」なので「しないほうがいい」が適切です。"
+                    }
+                ]
+            },
+            "検討する": {
+                examples: [
+                    {
+                        japanese: "新(あたら)しい企画(きかく)について、チーム全員(ぜんいん)で前向(まえむ)きに検討(けんとう)しています。",
+                        english: "The whole team is positively considering the new proposal.",
+                        teacherNote: "ビジネス場面で多用される「検討する」です。「考える」よりも改まった客観的・公式な表現であることを指導します。"
+                    },
+                    {
+                        japanese: "いただいたご提案(ていあん)は、社内(しゃない)でよく検討(けんとう)した上(うえ)でお返事(へんじ)いたします。",
+                        english: "We will reply after carefully considering your proposal internally.",
+                        teacherNote: "ビジネスメールや商談でよく使われる定番フレーズ「検討した上で」です。"
+                    },
+                    {
+                        japanese: "予算(よさん)の都合(つごう)により、計画(けいかく)の変更(へんこう)を検討(けんとう)する必要(ひつよう)があります。",
+                        english: "Due to budget constraints, we need to consider revising the plan.",
+                        teacherNote: "「〜を検討する必要がある」の形での問題提起の用法を練習します。"
+                    }
+                ],
+                quizzes: [
+                    {
+                        question: "会議(かいぎ)で 次(つぎ)のイベントの 企画(きかく)について （　　） することにしました。",
+                        options: ["1. 検討", "2. 復習", "3. 予習", "4. 遠慮"],
+                        answer: 0,
+                        explanation: "吟味・多角的に考究する意味には「検討」が最も適切です。"
+                    },
+                    {
+                        question: "その問題(もんだい)につきましては、現在(げんざい)社内(しゃない)で （　　） 中でございます。",
+                        options: ["1. 検討", "2. 見当", "3. 探検", "4. 調査済"],
+                        answer: 0,
+                        explanation: "ビジネスで頻出する「検討中（けんとうちゅう）」の表現です。"
+                    },
+                    {
+                        question: "新(あたら)しい方針(ほうしん)を （　　） する余地(よち)があります。",
+                        options: ["1. 検討", "2. 決定", "3. 考慮済", "4. 発見"],
+                        answer: 0,
+                        explanation: "「検討する余地がある」で、まだ議論や再考の可能性があることを表します。"
+                    }
+                ]
+            }
+        };
 
         // ---- DOM要素参照 ----
-        const apiKeyInput = document.getElementById('apiKeyInput');
-        const saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
+        const openApiKeyModalBtn = document.getElementById('openApiKeyModalBtn');
+        const headerApiKeyStatus = document.getElementById('headerApiKeyStatus');
+        const apiKeyModal = document.getElementById('apiKeyModal');
+        const closeApiKeyModalBtn = document.getElementById('closeApiKeyModalBtn');
+        const cancelApiKeyBtn = document.getElementById('cancelApiKeyBtn');
+        const modalApiKeyInput = document.getElementById('modalApiKeyInput');
+        const saveAndGenerateModalBtn = document.getElementById('saveAndGenerateModalBtn');
+        const toggleApiKeyVisibilityBtn = document.getElementById('toggleApiKeyVisibilityBtn');
+        const eyeIcon = document.getElementById('eyeIcon');
+
         const generatorForm = document.getElementById('generatorForm');
         const keywordInput = document.getElementById('keyword');
         const jlptLevelSelect = document.getElementById('jlptLevel');
@@ -878,6 +555,13 @@
         const tabQuizBtn = document.getElementById('tabQuizBtn');
         const placeholderState = document.getElementById('placeholderState');
         const loadingState = document.getElementById('loadingState');
+        const loadingTitle = document.getElementById('loadingTitle');
+        const loadingSubtitle = document.getElementById('loadingSubtitle');
+        const errorState = document.getElementById('errorState');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorOpenKeyBtn = document.getElementById('errorOpenKeyBtn');
+        const errorRetryBtn = document.getElementById('errorRetryBtn');
+
         const sentencesContent = document.getElementById('sentencesContent');
         const sentencesList = document.getElementById('sentencesList');
         const quizContent = document.getElementById('quizContent');
@@ -896,36 +580,93 @@
         // ---- 初期化処理 ----
         function init() {
             lucide.createIcons();
-            const savedKey = localStorage.getItem('gemini_api_key');
-            if (savedKey) {
-                apiKeyInput.value = savedKey;
-            }
+            updateApiKeyUI();
             updateHistoryUI();
+            setupPresetChips();
         }
 
-        // ---- APIキー保存 ----
-        saveApiKeyBtn.addEventListener('click', () => {
-            const key = apiKeyInput.value.trim();
+        // ---- APIキー関連モーダル・UI制御 ----
+        function updateApiKeyUI() {
+            const key = (localStorage.getItem('gemini_api_key') || '').trim();
+            if (key) {
+                headerApiKeyStatus.textContent = "Gemini API 設定済 ✓";
+                headerApiKeyStatus.className = "text-emerald-200 font-semibold";
+                if (modalApiKeyInput) modalApiKeyInput.value = key;
+            } else {
+                headerApiKeyStatus.textContent = "Gemini API 未設定 ⚠";
+                headerApiKeyStatus.className = "text-amber-200 font-semibold";
+                if (modalApiKeyInput) modalApiKeyInput.value = '';
+            }
+        }
+
+        function openApiKeyModal() {
+            const savedKey = localStorage.getItem('gemini_api_key') || '';
+            if (modalApiKeyInput) modalApiKeyInput.value = savedKey;
+            apiKeyModal.classList.remove('hidden');
+            setTimeout(() => modalApiKeyInput && modalApiKeyInput.focus(), 50);
+            lucide.createIcons();
+        }
+
+        function closeApiKeyModal() {
+            apiKeyModal.classList.add('hidden');
+        }
+
+        function toggleApiKeyVisibility() {
+            if (!modalApiKeyInput) return;
+            if (modalApiKeyInput.type === 'password') {
+                modalApiKeyInput.type = 'text';
+                eyeIcon.setAttribute('data-lucide', 'eye-off');
+            } else {
+                modalApiKeyInput.type = 'password';
+                eyeIcon.setAttribute('data-lucide', 'eye');
+            }
+            lucide.createIcons();
+        }
+
+        function saveAndGenerateFromModal() {
+            const key = (modalApiKeyInput.value || '').trim();
             if (key) {
                 localStorage.setItem('gemini_api_key', key);
-                showToast("APIキーを保存しました");
+                updateApiKeyUI();
+                closeApiKeyModal();
+                showToast("Gemini APIキーを保存しました");
+                handleGenerate();
             } else {
-                localStorage.removeItem('gemini_api_key');
-                showToast("APIキーをクリアしました");
+                alert("APIキーを入力してください。Google AI Studioで無料取得できます。");
             }
-        });
+        }
+
+        openApiKeyModalBtn.addEventListener('click', openApiKeyModal);
+        closeApiKeyModalBtn.addEventListener('click', closeApiKeyModal);
+        cancelApiKeyBtn.addEventListener('click', closeApiKeyModal);
+        toggleApiKeyVisibilityBtn.addEventListener('click', toggleApiKeyVisibility);
+        saveAndGenerateModalBtn.addEventListener('click', saveAndGenerateFromModal);
+        errorOpenKeyBtn.addEventListener('click', openApiKeyModal);
+        errorRetryBtn.addEventListener('click', handleGenerate);
+
+        // ---- プリセットチップのクリック連携 ----
+        function setupPresetChips() {
+            document.querySelectorAll('.preset-chip').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const word = btn.dataset.word;
+                    const level = btn.dataset.level;
+                    const context = btn.dataset.context;
+                    if (word) keywordInput.value = word;
+                    if (level) jlptLevelSelect.value = level;
+                    if (context) contextCategorySelect.value = context;
+                    handleGenerate();
+                });
+            });
+        }
 
         // ---- ふりがな表記変換ヘルパー ----
         // 漢字(かんじ) 形式を <ruby>漢字<rt>かんじ</rt></ruby> に変換
         function formatRuby(text) {
             if (!text) return '';
-            // 既に<ruby>タグが含まれている場合はそのまま
             if (text.includes('<ruby>')) return text;
-            // 漢字(よみ) パターンを ruby タグに置換
             return text.replace(/([一-龯々ヶ]+)\(([^)]+)\)/g, '<ruby>$1<rt>$2</rt></ruby>');
         }
 
-        // ruby タグや 漢字(かんじ) からルビを取り除いて漢字のみを抽出（検索やプレーン用）
         function stripRuby(text) {
             if (!text) return '';
             return text.replace(/<ruby>(.*?)<rt>.*?<\/rt><\/ruby>/g, '$1')
@@ -968,33 +709,40 @@
             }
         });
 
-        // ---- Gemini API 生成プロンプト構築 ----
+        // ---- 手順２：Gemini API 生成プロンプト構築 ----
         function buildPrompt(keyword, level, context, count) {
             return `あなたは日本語教育（日本語教師）のプロフェッショナルです。
-留学生などの日本語学習者に向けて、指定された「語彙・文法項目」を使った例文と、学習内容を確認するための「穴埋めテスト問題」を作成してください。
+留学生などの日本語学習者に向けて、指定された語句（語彙・文法項目）を使った、文脈に即した自然で実践的な例文と、学習内容を確認するための4択穴埋めテスト問題を作成してください。
 
 ### 【入力条件】
-- 検索・対象項目: ${keyword}
+- 検索・対象語句: 「${keyword}」
 - 学習者レベル: ${level}
-- 利用場面・文脈: ${context}
-- 例文の作成数: ${count}件
+- 指定された利用場面・使用シーン: ${context}
+- 作成件数: ${count}件
 
-### 【作成・出力のルール】
-1. **語彙・文法レベルの厳守**:
-   - 指定されたJLPTレベル（${level}）の学習者がすでに習得している、または理解できる語彙や漢字・文法のみを使用してください。指定レベルを超えた難しい語彙や複雑な漢字は使わないでください。
-2. **ルビ（ふりがな）の表記**:
+### 【作成・出力のルール（※厳格遵守）】
+1. **語句の品詞・性質に応じた自然な文の生成（※単なる穴埋め置換の完全禁止）**:
+   - 語句「${keyword}」をテンプレート文に機械的に当てはめること（例：「〜を正しく使うことが大切です」等）は【絶対に禁止】です。
+   - 「${keyword}」の本来の品詞（名詞、な形容詞、い形容詞、動詞、副詞、文法連語など）を正確に分析し、日本語として極めて自然なコロケーション（共起表現）を用いて文を作成してください。
+   （例：「身近」であれば な形容詞・名詞として「身近(みぢか)な問題(もんだい)」「身近(みぢか)に感(かん)じる」「身近(みぢか)な例(れい)」等の自然な形で使用する）
+2. **指定場面（${context}）への完全合致**:
+   - 必ず指定された場面（${context}）に即した具体的なシチュエーション（会話、体験、業務、学校生活など）を描写した文にしてください。
+3. **学習者レベル（${level}）の厳格な準拠**:
+   - 文中の語彙、文法、漢字はすべて ${level} の学習者がすでに習得している、または理解できる範囲に限定してください。指定レベルを超える難読漢字や高度な語彙は避けてください。
+4. **ルビ（ふりがな）の表記**:
    - 漢字にはすべて、漢字(かんじ) のように括弧でルビ（読み方）をつけてください。
-3. **自然で実用的な文脈**:
-   - 留学生が実際の生活や教室でそのまま使える、文脈が分かりやすい自然な日本語にしてください。
-4. **確認テストの作成**:
-   - 生成した例文をベースに、指定項目（${keyword}）の定着度を測る「4択の穴埋め問題」を例文と同数作成してください。誤答の選択肢（ダミー）も学習者がよく間違えやすい文法・形態（例：ナイ形とタ形の誤用、助詞の誤用など）を入れてください。
+5. **教師向け指導ポイント**:
+   - 各例文について、日本語教師が指導する際のポイント（品詞の接続、よくある留学生の誤用、ニュアンス）を明記してください。
+6. **確認テストの作成**:
+   - 生成した例文をベースに、「${keyword}」の定着度を測る「4択の穴埋め問題」を例文と同数作成してください。
+   - 誤答の選択肢（ダミー）にも学習者が典型的に間違えやすい文法・形態（助詞の誤用、テ形・タ形の混同、異なる品詞接続など）を入れてください。
 
 ### 【返却フォーマット】
 必ず以下のJSON形式のみを出力してください。Markdownのコードブロックや余計な解説は不要です。
 {
   "examples": [
     {
-      "japanese": "漢字(かんじ)にルビをつけた例文",
+      "japanese": "漢字(かんじ)にルビをつけた自然な例文",
       "english": "英語訳",
       "teacherNote": "教師向けの指導ポイント・解説・よくある誤用"
     }
@@ -1011,91 +759,94 @@
 ※ answer は 正解の選択肢のインデックス（0, 1, 2, 3 のいずれか）を指定してください。`;
         }
 
-        // ---- 生成処理メイン ----
+        // ---- 手順１〜３：生成処理メインパイプライン ----
         async function handleGenerate(e) {
             if (e) e.preventDefault();
 
+            // 手順１：検索項目、レベル、使用シーンの取得
             let keyword = keywordInput.value.trim();
             if (!keyword) {
-                keyword = "〜ないほうがいいです";
-                keywordInput.value = keyword;
+                keywordInput.focus();
+                showToast("検索項目（語彙・文法）を入力してください");
+                return;
             }
 
             const level = jlptLevelSelect.value;
             const context = contextCategorySelect.value;
             const count = parseInt(sentenceCountSelect.value, 10) || 3;
-            const apiKey = apiKeyInput.value.trim() || localStorage.getItem('gemini_api_key');
+            const apiKey = (localStorage.getItem('gemini_api_key') || '').trim();
 
-            // ローディング表示
+            // APIキーの有無を確認
+            if (!apiKey) {
+                // 事前収録デモプリセットと完全一致している場合のみデモ表示
+                const clean = keyword.replace(/^[〜~～\s]+/, '').trim();
+                const demoMatch = DEMO_PRESETS[clean] || DEMO_PRESETS[keyword];
+                if (demoMatch) {
+                    currentData = {
+                        keyword,
+                        level,
+                        context,
+                        count,
+                        source: "事前収録デモ",
+                        createdAt: new Date().toISOString(),
+                        ...demoMatch
+                    };
+                    switchTab('sentences');
+                    renderOutput(currentData);
+                    saveCurrentBtn.disabled = false;
+                    printBtn.disabled = false;
+                    showToast("※事前収録デモを表示しました。Gemini AI生成を行うには右上の「Gemini API 設定」を行ってください。");
+                    return;
+                }
+
+                // 自由入力語句（例：「身近」等）は機械的置換をせず、Gemini APIキーの入力を促す
+                openApiKeyModal();
+                showToast(`「${keyword}」の例文をGeminiで生成するため、APIキーを入力してください`);
+                return;
+            }
+
+            // 手順２：語句を使った例文をGeminiを使用して生成
             placeholderState.classList.add('hidden');
             sentencesContent.classList.add('hidden');
             quizContent.classList.add('hidden');
+            errorState.classList.add('hidden');
             loadingState.classList.remove('hidden');
+
+            loadingTitle.textContent = `Gemini AI で「${keyword}」の例文とテストを生成中...`;
+            loadingSubtitle.textContent = `レベル: ${level} ｜ 使用シーン: ${context} に適した自然な日本語を構成しています`;
             generateBtn.disabled = true;
 
-            let source = "内蔵スマートエンジン";
-
             try {
-                let data = null;
+                const data = await fetchFromGemini(apiKey, keyword, level, context, count);
 
-                if (apiKey) {
-                    try {
-                        data = await fetchFromGemini(apiKey, keyword, level, context, count);
-                        source = "Gemini AI";
-                        showToast("Gemini AIにより例文とテストを生成しました");
-                    } catch (apiErr) {
-                        console.warn("Gemini APIエラー。動的生成エンジンにフォールバックします:", apiErr);
-                        showToast("APIエラーのため内蔵スマートエンジンで生成しました");
-                        data = generateDynamicContent(keyword, level, context, count);
-                        source = "内蔵スマートエンジン";
-                    }
-                } else {
-                    // APIキー未設定時は内蔵のスマート文法生成エンジンを使用
-                    await new Promise(r => setTimeout(r, 400));
-                    data = generateDynamicContent(keyword, level, context, count);
-                    source = "内蔵スマートエンジン";
-                    showToast("例文と確認テストを生成しました");
-                }
-
+                // 手順３：例文を表示
                 currentData = {
                     keyword,
                     level,
                     context,
                     count,
-                    source,
+                    source: "Gemini AI",
                     createdAt: new Date().toISOString(),
                     ...data
                 };
 
-                // 「例文と解説」タブをアクティブにして描画
                 switchTab('sentences');
                 renderOutput(currentData);
-
                 saveCurrentBtn.disabled = false;
                 printBtn.disabled = false;
+                showToast(`Gemini AI により「${keyword}」の例文とテストを生成しました`);
 
-                // 画面幅が狭い場合など、結果エリアが見えるようスムーズスクロール
                 const outputEl = document.getElementById('outputContainer');
                 if (outputEl && window.innerWidth < 1024) {
                     outputEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
 
             } catch (err) {
-                console.error("生成処理エラー:", err);
-                // 最終セーフガードとして動的コンテンツを即時表示
-                const safeData = generateDynamicContent(keyword, level, context, count);
-                currentData = {
-                    keyword,
-                    level,
-                    context,
-                    count,
-                    createdAt: new Date().toISOString(),
-                    ...safeData
-                };
-                switchTab('sentences');
-                renderOutput(currentData);
-                saveCurrentBtn.disabled = false;
-                printBtn.disabled = false;
+                console.error("Gemini API生成エラー:", err);
+                loadingState.classList.add('hidden');
+                errorState.classList.remove('hidden');
+                errorMessage.textContent = err.message || "通信またはAPIキーエラーが発生しました。Google AI StudioでAPIキーの状態をご確認ください。";
+                showToast("Gemini AI による生成に失敗しました");
             } finally {
                 loadingState.classList.add('hidden');
                 generateBtn.disabled = false;
@@ -1106,38 +857,61 @@
         generatorForm.addEventListener('submit', handleGenerate);
         generateBtn.addEventListener('click', handleGenerate);
 
-        // ---- Gemini API 呼び出し ----
+        // ---- Gemini API 呼び出し（モデル自動フォールバック対応） ----
         async function fetchFromGemini(apiKey, keyword, level, context, count) {
             const prompt = buildPrompt(keyword, level, context, count);
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+            let lastError = null;
 
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        response_mime_type: "application/json"
+            for (const model of models) {
+                try {
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: prompt }] }],
+                            generationConfig: {
+                                response_mime_type: "application/json"
+                            }
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const errData = await response.json().catch(() => ({}));
+                        const errMsg = errData.error?.message || `HTTP ${response.status}`;
+                        if (response.status === 404) {
+                            lastError = new Error(`モデル ${model} が利用できません`);
+                            continue;
+                        }
+                        if (response.status === 400 && errMsg.includes('API_KEY_INVALID')) {
+                            throw new Error("Gemini APIキーが無効です。Google AI Studioで正しいAPIキーを取得して設定してください。");
+                        }
+                        throw new Error(errMsg);
                     }
-                })
-            });
 
-            if (!response.ok) {
-                const errData = await response.json().catch(() => ({}));
-                throw new Error(errData.error?.message || `APIリクエスト失敗 (Status: ${response.status})`);
+                    const resJson = await response.json();
+                    const textContent = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (!textContent) throw new Error("Geminiからの応答が空でした");
+
+                    // Markdownコードフェンス (```json ... ```) の除去処理
+                    let cleanJson = textContent.trim();
+                    if (cleanJson.startsWith('```')) {
+                        cleanJson = cleanJson.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+                    }
+
+                    const parsed = JSON.parse(cleanJson);
+                    if (!parsed.examples || !Array.isArray(parsed.examples)) {
+                        throw new Error("Geminiから返却されたデータ構造が不正です");
+                    }
+
+                    return parsed;
+                } catch (err) {
+                    lastError = err;
+                    if (err.message.includes('APIキーが無効')) throw err;
+                }
             }
-
-            const resJson = await response.json();
-            const textContent = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!textContent) throw new Error("モデルからの応答が空でした");
-
-            // Markdownコードフェンス (```json ... ```) の除去処理
-            let cleanJson = textContent.trim();
-            if (cleanJson.startsWith('```')) {
-                cleanJson = cleanJson.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-            }
-
-            return JSON.parse(cleanJson);
+            throw lastError || new Error("Gemini APIの通信に失敗しました");
         }
 
         // ---- 描画処理 ----
@@ -1441,6 +1215,7 @@
             sentencesContent.classList.add('hidden');
             quizContent.classList.add('hidden');
             loadingState.classList.add('hidden');
+            if (errorState) errorState.classList.add('hidden');
             placeholderState.classList.remove('hidden');
             saveCurrentBtn.disabled = true;
             printBtn.disabled = true;
