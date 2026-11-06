@@ -585,6 +585,73 @@
             lucide.createIcons();
         }
 
+        // ---- 利用可能なモデル一覧を動的取得（APIのListModelsを直接呼び出し） ----
+        async function getAvailableModels(apiKey) {
+            const versions = ['v1beta', 'v1'];
+            let allModels = [];
+
+            for (const ver of versions) {
+                try {
+                    const res = await fetch(`https://generativelanguage.googleapis.com/${ver}/models?key=${apiKey}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.models && Array.isArray(data.models)) {
+                            // generateContent をサポートしているモデルのみ抽出
+                            const valid = data.models
+                                .filter(m => !m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent'))
+                                .map(m => ({
+                                    name: m.name.replace(/^models\//, ''),
+                                    version: ver,
+                                    displayName: m.displayName || m.name
+                                }));
+                            allModels.push(...valid);
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`モデル一覧取得スキップ (${ver}):`, e);
+                }
+            }
+
+            // 重複排除
+            const seen = new Set();
+            const uniqueModels = [];
+            for (const m of allModels) {
+                const key = `${m.version}:${m.name}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    uniqueModels.push(m);
+                }
+            }
+
+            if (uniqueModels.length > 0) {
+                // 最適なモデル順にソート（2.0-flash / 1.5-flash などの高速・安定モデルを最優先）
+                uniqueModels.sort((a, b) => {
+                    const score = (m) => {
+                        const n = m.name.toLowerCase();
+                        if (n.includes('2.0-flash')) return 100;
+                        if (n.includes('1.5-flash-8b')) return 92;
+                        if (n.includes('1.5-flash')) return 90;
+                        if (n.includes('flash')) return 80;
+                        if (n.includes('1.5-pro')) return 70;
+                        if (n.includes('pro')) return 60;
+                        return 10;
+                    };
+                    return score(b) - score(a);
+                });
+                return uniqueModels;
+            }
+
+            // 万が一ListModelsが取得できなかった場合のフォールバックリスト
+            return [
+                { name: 'gemini-1.5-flash', version: 'v1beta' },
+                { name: 'gemini-1.5-flash', version: 'v1' },
+                { name: 'gemini-2.0-flash', version: 'v1beta' },
+                { name: 'gemini-1.5-flash-8b', version: 'v1beta' },
+                { name: 'gemini-1.5-pro', version: 'v1beta' },
+                { name: 'gemini-pro', version: 'v1' }
+            ];
+        }
+
         async function testApiKeyConnection() {
             const rawKey = modalApiKeyInput.value || localStorage.getItem('gemini_api_key') || '';
             const key = rawKey.replace(/["'\r\n\s]/g, '');
@@ -594,34 +661,21 @@
                 return;
             }
 
-            testApiStatus.textContent = "接続確認中...";
+            testApiStatus.textContent = "利用可能モデルを確認中...";
             testApiStatus.className = "text-xs text-slate-500 font-medium";
 
             try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
-                const res = await fetch(url);
-                if (!res.ok) {
-                    const errData = await res.json().catch(() => ({}));
-                    const msg = errData.error?.message || `HTTP ${res.status}`;
-                    if (res.status === 400 && (msg.includes('API_KEY_INVALID') || msg.includes('API key not valid'))) {
-                        testApiStatus.textContent = "✕ APIキーが無効です";
-                        testApiStatus.className = "text-xs text-rose-600 font-bold";
-                        return;
-                    }
-                    testApiStatus.textContent = `✕ 失敗: ${msg}`;
+                const models = await getAvailableModels(key);
+                if (models && models.length > 0) {
+                    const displayList = models.map(m => m.name).slice(0, 3).join(', ');
+                    testApiStatus.textContent = `✓ 接続成功！利用可能: ${displayList}`;
+                    testApiStatus.className = "text-xs text-emerald-600 font-bold";
+                } else {
+                    testApiStatus.textContent = "✕ モデル一覧が取得できませんでした。キーの有効性をご確認ください。";
                     testApiStatus.className = "text-xs text-rose-600 font-medium";
-                    return;
                 }
-
-                const data = await res.json();
-                const modelNames = (data.models || []).map(m => m.name.replace('models/', ''));
-                const hasFlash = modelNames.some(m => m.includes('flash'));
-                testApiStatus.textContent = hasFlash 
-                    ? `✓ 接続成功！利用可能: ${modelNames.filter(m => m.includes('flash')).slice(0, 2).join(', ')}` 
-                    : `✓ 接続成功 (${modelNames.length}個のモデル)`;
-                testApiStatus.className = "text-xs text-emerald-600 font-bold";
             } catch (err) {
-                testApiStatus.textContent = `✕ 通信エラー: ${err.message}`;
+                testApiStatus.textContent = `✕ エラー: ${err.message}`;
                 testApiStatus.className = "text-xs text-rose-600 font-medium";
             }
         }
@@ -787,15 +841,15 @@
             generateBtn.disabled = true;
 
             try {
-                const text = await fetchFromGemini(apiKey, keyword, level, context, count);
+                const result = await fetchFromGemini(apiKey, keyword, level, context, count);
 
                 currentData = {
                     keyword,
                     level,
                     context,
                     count,
-                    source: "Gemini AI",
-                    rawText: text,
+                    source: `Gemini AI (${result.usedModel})`,
+                    rawText: result.text,
                     createdAt: new Date().toISOString()
                 };
 
@@ -823,7 +877,7 @@
         generatorForm.addEventListener('submit', handleGenerate);
         generateBtn.addEventListener('click', handleGenerate);
 
-        // ---- Gemini API 呼び出し（モデル自動フォールバック対応） ----
+        // ---- Gemini API 呼び出し（利用可能モデルの動的自動検出＆生成） ----
         async function fetchFromGemini(rawApiKey, keyword, level, context, count) {
             const apiKey = (rawApiKey || '').replace(/["'\r\n\s]/g, '');
             if (!apiKey) {
@@ -831,21 +885,16 @@
             }
 
             const prompt = buildPrompt(keyword, level, context, count);
-            const models = [
-                'gemini-1.5-flash',
-                'gemini-1.5-flash-latest',
-                'gemini-1.5-flash-001',
-                'gemini-1.5-flash-002',
-                'gemini-2.0-flash-exp',
-                'gemini-2.0-flash',
-                'gemini-1.5-pro'
-            ];
+
+            // 1. そのAPIキーで利用可能なモデル一覧をGoogleから動的取得
+            const availableModels = await getAvailableModels(apiKey);
 
             let attemptErrors = [];
 
-            for (const model of models) {
+            // 2. 取得した利用可能なモデルで順次 generateContent を実行
+            for (const m of availableModels) {
                 try {
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                    const url = `https://generativelanguage.googleapis.com/${m.version}/models/${m.name}:generateContent?key=${apiKey}`;
                     const response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -868,7 +917,7 @@
                             throw new Error("【利用制限】APIのリクエスト上限に達しました。数十秒待ってから再試行してください。");
                         }
 
-                        attemptErrors.push(`[${model}] ${errMsg}`);
+                        attemptErrors.push(`[${m.name} (${m.version})] ${errMsg}`);
                         continue;
                     }
 
@@ -876,16 +925,19 @@
                     const textContent = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (!textContent) throw new Error("Geminiからの応答が空でした");
 
-                    return textContent.trim();
+                    return {
+                        text: textContent.trim(),
+                        usedModel: m.name
+                    };
                 } catch (err) {
                     if (err.message.includes('【APIキー無効】') || err.message.includes('【権限エラー】') || err.message.includes('【利用制限】')) {
                         throw err;
                     }
-                    attemptErrors.push(err.message);
+                    attemptErrors.push(`[${m.name}] ${err.message}`);
                 }
             }
 
-            throw new Error(`全Geminiモデルへの接続に失敗しました:\n${attemptErrors[0] || 'モデルが利用できません'}\n※Google AI Studioで新しいAPIキーを再作成することをおすすめします。`);
+            throw new Error(`利用可能なGeminiモデルでの生成に失敗しました:\n${attemptErrors.slice(0, 3).join('\n')}\n※APIキーの権限、またはGoogle AI Studioで新しいAPIキーの作成をお試しください。`);
         }
 
         // ---- 描画処理 ----
