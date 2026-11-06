@@ -16,13 +16,19 @@
             font-family: 'Noto Sans JP', sans-serif;
             background-color: #f8fafc;
         }
+        ruby {
+            ruby-position: over;
+            display: inline-ruby;
+        }
         ruby rt {
             font-size: 0.65em;
-            color: #4b5563;
+            color: #64748b;
             user-select: none;
+            line-height: 1;
         }
+        .hide-ruby rt,
         .hide-ruby ruby rt {
-            display: none;
+            display: none !important;
         }
 
         /* 生成コンテンツ（Markdown）のスタイリング */
@@ -718,11 +724,40 @@
         }
 
         // ---- ふりがな表記変換ヘルパー ----
-        // 漢字(かんじ) 形式を <ruby>漢字<rt>かんじ</rt></ruby> に変換
+        // 1. 半角/全角括弧の「漢字(かんじ)」または「漢字（かんじ）」を <ruby>漢字<rt>かんじ</rt></ruby> に変換
+        // 2. 万が一AIが「ひらがな（漢字）」の逆順（例：にほん（日本）、らいふ（生活）、おおい（多い））を出力した場合の自己修復機能も備える
         function formatRuby(text) {
             if (!text) return '';
-            if (text.includes('<ruby>')) return text;
-            return text.replace(/([一-龯々ヶ]+)\(([^)]+)\)/g, '<ruby>$1<rt>$2</rt></ruby>');
+            let fixed = text;
+            
+            // AIが「ひらがな（漢字）」や「送り仮名付きのひらがな（漢字）」を出力した場合の逆順修復
+            // 例: にほん（日本） -> 日本(にほん)
+            // 例: おおい（多い） -> 多い(おおい)
+            fixed = fixed.replace(/([ぁ-んァ-ヶー]+)[（\(]([一-龯々ヶ]+)([ぁ-んァ-ヶー]*)[）\)]/g, (match, hira, kanji, okuri) => {
+                let cleanHira = hira;
+                if (okuri && cleanHira.endsWith(okuri)) {
+                    cleanHira = cleanHira.slice(0, -okuri.length);
+                }
+                return `${kanji}(${cleanHira})${okuri}`;
+            });
+
+            // 漢字(ひらがな/カタカナ) または 漢字（ひらがな/カタカナ） を <ruby>漢字<rt>ひらがな</rt></ruby> に変換
+            fixed = fixed.replace(/([一-龯々ヶ]+)[（\(]([ぁ-んァ-ヶー]+)[）\)]/g, '<ruby>$1<rt>$2</rt></ruby>');
+
+            return fixed;
+        }
+
+        // ふりがな除去ヘルパー（プレーンテキスト化）
+        function stripRuby(text) {
+            if (!text) return '';
+            let s = text;
+            // 逆順の「ひらがな（漢字）」を漢字に
+            s = s.replace(/([ぁ-んァ-ヶー]+)[（\(]([一-龯々ヶ]+)([ぁ-んァ-ヶー]*)[）\)]/g, '$2$3');
+            // 通常の「漢字(ひらがな)」または「漢字（ひらがな）」を漢字だけに
+            s = s.replace(/([一-龯々ヶ]+)[（\(][ぁ-んァ-ヶー]+[）\)]/g, '$1');
+            // <ruby>漢字<rt>かんじ</rt></ruby> タグを漢字だけに
+            s = s.replace(/<ruby>([一-龯々ヶ]+)<rt>[^<]*<\/rt><\/ruby>/g, '$1');
+            return s;
         }
 
         // ---- ふりがな表示切り替え ----
@@ -751,10 +786,14 @@
 ### 【作成・出力のルール】
 1. **語彙・文法レベルの厳守**:
    - 指定されたJLPTレベル（${level}）の学習者がすでに習得している、または理解できる語彙や漢字・文法のみを使用してください。指定レベルを超えた難しい語彙や複雑な漢字は使わないでください。
-2. **ルビ（ふりがな）の表記**:
-   - 漢字にはすべて、漢字(かんじ) のように括弧でルビ（読み方）をつけてください。
+2. **ルビ（ふりがな）の表記とWeb表示連動**:
+   - **本文は必ず自然で正しい日本語の漢字かな交じり文にしてください**（漢字をすべてひらがなに変えてはいけません。不自然なカタカナ語への置き換えも禁止です）。
+   - Web画面上で「ふりがなの表示・非表示」を正しく切り替えるため、すべての漢字の直後に **漢字(かんじ)** の形式でルビ（読み方）をつけてください。半角括弧または全角括弧で記載してください。
+   - 【NG例】: にほん（日本）の らいふ（生活）は たいへんという 人（ひと）が おおいです。 （※ひらがなに（漢字）をつけたり、漢字をひらがな化するのは厳禁です）
+   - 【OK例】: 日本(にほん)の生活(せいかつ)は大変(たいへん)という人(ひと)が多(おお)いです。
+   - 送り仮名がある語句は「多(おお)い」「食(た)べる」または「多い(おおい)」のように漢字に対応する読み方を記載してください。
 3. **自然で実用的な文脈**:
-   - 留学生が実際の生活や教室でそのまま使える、文脈が分かりやすい自然な日本語にしてください。
+   - 単なる語句の機械的挿入（例：「〜を正しく使う」等）ではなく、その語彙・文法の本来の語義・コロケーション・文脈に沿った、留学生が実際の生活や教室でそのまま使える自然な日本語にしてください。
 4. **確認テストの作成**:
    - 生成した例文をベースに、指定項目（${keyword}）の定着度を測る「4択の穴埋め問題」を例文と同数作成してください。誤答の選択肢（ダミー）も学習者がよく間違えやすい文法・形態（例：ナイ形とタ形の誤用など）を入れてください。
 
@@ -981,36 +1020,37 @@
             lucide.createIcons();
         }
 
-        // ---- コピー機能 ----
+        // ---- コピー機能（表示・非表示の状態に連動） ----
         copyAllBtn.addEventListener('click', async () => {
             if (!currentData || !currentData.rawText) return;
+            const textToCopy = isFuriganaVisible ? currentData.rawText : stripRuby(currentData.rawText);
             try {
-                await navigator.clipboard.writeText(currentData.rawText);
-                showToast("全文をクリップボードにコピーしました");
+                await navigator.clipboard.writeText(textToCopy);
+                showToast(isFuriganaVisible ? "全文（ふりがな付き）をコピーしました" : "全文（ふりがな非表示）をコピーしました");
             } catch (err) {
-                fallbackCopy(currentData.rawText);
+                fallbackCopy(textToCopy);
             }
         });
 
         copyQuizBtn.addEventListener('click', async () => {
             if (!currentData || !currentData.rawText) return;
             // 「■ 理解度確認テスト（学生用）」から「■ テストの解答と解説」の手前までを抽出
-            const text = currentData.rawText;
-            const startIdx = text.indexOf('#### ■ 理解度確認テスト（学生用）');
-            const endIdx = text.indexOf('#### ■ テストの解答と解説（教師用）');
+            const sourceText = isFuriganaVisible ? currentData.rawText : stripRuby(currentData.rawText);
+            const startIdx = sourceText.indexOf('#### ■ 理解度確認テスト（学生用）');
+            const endIdx = sourceText.indexOf('#### ■ テストの解答と解説（教師用）');
             
             let quizText = '';
             if (startIdx !== -1 && endIdx !== -1) {
-                quizText = text.substring(startIdx, endIdx).replace(/---+\s*$/, '').trim();
+                quizText = sourceText.substring(startIdx, endIdx).replace(/---+\s*$/, '').trim();
             } else if (startIdx !== -1) {
-                quizText = text.substring(startIdx).trim();
+                quizText = sourceText.substring(startIdx).trim();
             } else {
-                quizText = text;
+                quizText = sourceText;
             }
 
             try {
                 await navigator.clipboard.writeText(quizText);
-                showToast("学生用テストをクリップボードにコピーしました");
+                showToast(isFuriganaVisible ? "学生用テスト（ふりがな付き）をコピーしました" : "学生用テスト（ふりがな非表示）をコピーしました");
             } catch (err) {
                 fallbackCopy(quizText);
             }
