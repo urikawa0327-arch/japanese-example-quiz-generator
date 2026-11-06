@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>日本語学習者向け 例文＆テスト作成ツール</title>
+    <title>日本語学習者向け 例文＆確認テスト作成ツール</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Canvas Confetti -->
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Marked.js (Markdownパーサー) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
         body {
@@ -24,42 +24,76 @@
         .hide-ruby ruby rt {
             display: none;
         }
-        @media print {
-            .no-print {
-                display: none !important;
-            }
-            .print-only {
-                display: block !important;
-            }
-            body {
-                background-color: white;
-                color: black;
-            }
-            .page-break {
-                page-break-before: always;
-            }
+
+        /* 生成コンテンツ（Markdown）のスタイリング */
+        .generated-content h4 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #312e81; /* indigo-900 */
+            background: #eef2ff; /* indigo-50 */
+            border-left: 4px solid #4f46e5; /* indigo-600 */
+            padding: 0.6rem 0.85rem;
+            border-radius: 0.375rem;
+            margin-top: 1.75rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
-        .print-only {
-            display: none;
+        .generated-content h4:first-child {
+            margin-top: 0;
+        }
+        .generated-content ol {
+            list-style-type: decimal;
+            padding-left: 1.5rem;
+            margin-bottom: 1.25rem;
+        }
+        .generated-content ul {
+            list-style-type: disc;
+            padding-left: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .generated-content li {
+            margin-bottom: 0.6rem;
+            line-height: 1.8;
+            color: #1e293b;
+        }
+        .generated-content li > ul {
+            margin-top: 0.35rem;
+            margin-bottom: 0.5rem;
+            padding-left: 1.25rem;
+        }
+        .generated-content p {
+            margin-bottom: 0.85rem;
+            line-height: 1.8;
+            color: #334155;
+        }
+        .generated-content hr {
+            margin: 1.75rem 0;
+            border-color: #e2e8f0;
+        }
+        .generated-content strong {
+            color: #0f172a;
+            font-weight: 700;
         }
     </style>
 </head>
 <body class="text-slate-800 antialiased min-h-screen flex flex-col">
 
-    <!-- ヘッダー (印刷非表示) -->
-    <header class="bg-indigo-600 text-white shadow-md no-print">
+    <!-- ヘッダー -->
+    <header class="bg-indigo-600 text-white shadow-md">
         <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center gap-3">
-                <div class="p-2 bg-indigo-500 rounded-lg">
+                <div class="p-2 bg-indigo-500 rounded-lg shadow-xs">
                     <i data-lucide="book-open-check" class="w-6 h-6 text-white"></i>
                 </div>
                 <div>
-                    <h1 class="text-xl font-bold tracking-tight">日本語学習者向け 例文＆テスト作成ツール</h1>
-                    <p class="text-xs text-indigo-200">語彙・文法項目からレベル別例文と確認テストを即座に生成</p>
+                    <h1 class="text-xl font-bold tracking-tight">日本語学習者向け 例文＆確認テスト作成ツール</h1>
+                    <p class="text-xs text-indigo-200">指定の語彙・文法からレベル別例文・指導ポイント・穴埋めテストを即座に作成</p>
                 </div>
             </div>
             
-            <!-- API Key 設定 -->
+            <!-- API Key 設定ボタン -->
             <div class="flex items-center gap-2">
                 <button type="button" id="openApiKeyModalBtn" class="flex items-center gap-1.5 bg-indigo-700/80 hover:bg-indigo-500 text-xs px-3 py-1.5 rounded-lg border border-indigo-400/40 transition font-medium shadow-xs">
                     <i data-lucide="key" class="w-3.5 h-3.5 text-indigo-300"></i>
@@ -70,17 +104,8 @@
     </header>
 
     <!-- メインコンテンツ -->
-    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 no-print">
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         
-        <!-- クリアボタンの案内バナー -->
-        <div class="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex items-start gap-2 shadow-sm">
-            <i data-lucide="info" class="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5"></i>
-            <div>
-                <span class="font-bold">クリア機能の配置について：</span>
-                入力フォームのやり直しは左フォーム下の<span class="inline-flex items-center gap-1 font-semibold text-rose-600 bg-rose-50 px-1 rounded border border-rose-200"><i data-lucide="rotate-ccw" class="w-3 h-3"></i> 入力と結果をすべてリセット</span>、表示中の生成結果のみ消去したい場合は右エリア右上にある<span class="inline-flex items-center gap-1 font-semibold text-slate-700 bg-slate-100 px-1 rounded border border-slate-300"><i data-lucide="trash-2" class="w-3 h-3 text-rose-500"></i> 結果をクリア</span>をご利用いただけます。
-            </div>
-        </div>
-
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
             <!-- 左側：設定・入力フォーム (4カラム) -->
@@ -96,16 +121,16 @@
                         <div>
                             <div class="flex items-center justify-between mb-1">
                                 <label for="keyword" class="block text-xs font-semibold text-slate-700">
-                                    検索項目（語彙・文法）<span class="text-rose-500">*</span>
+                                    検索・対象項目（語彙・文法）<span class="text-rose-500">*</span>
                                 </label>
                             </div>
-                            <input type="text" id="keyword" required placeholder="例: 身近, 〜ないほうがいいです, 検討する" value="身近" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
+                            <input type="text" id="keyword" required placeholder="例: 〜ないほうがいいです, 身近, 検討する" value="〜ないほうがいいです" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition">
                             
                             <!-- プリセットチップ -->
                             <div class="flex items-center gap-1.5 pt-2 flex-wrap text-[11px]">
                                 <span class="text-slate-400">例を試す:</span>
-                                <button type="button" class="preset-chip bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-200 transition" data-word="身近" data-level="N3" data-context="日常生活・学校生活">身近 (N3)</button>
                                 <button type="button" class="preset-chip bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-200 transition" data-word="〜ないほうがいいです" data-level="N4" data-context="日常生活・学校生活">〜ないほうがいい (N4)</button>
+                                <button type="button" class="preset-chip bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-200 transition" data-word="身近" data-level="N3" data-context="日常生活・学校生活">身近 (N3)</button>
                                 <button type="button" class="preset-chip bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-200 transition" data-word="検討する" data-level="N2" data-context="ビジネス・社会">検討する (N2)</button>
                             </div>
                         </div>
@@ -127,7 +152,7 @@
                         <!-- 利用場面・ターゲット -->
                         <div>
                             <label for="contextCategory" class="block text-xs font-semibold text-slate-700 mb-1">
-                                場面・文脈設定（任意）
+                                利用場面・文脈
                             </label>
                             <select id="contextCategory" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition bg-white">
                                 <option value="日常生活・学校生活">日常生活・学校生活</option>
@@ -173,7 +198,7 @@
                         </h3>
                         <span id="savedCount" class="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">0件</span>
                     </div>
-                    <div id="historyList" class="space-y-2 max-h-48 overflow-y-auto text-xs pr-1">
+                    <div id="historyList" class="space-y-2 max-h-56 overflow-y-auto text-xs pr-1">
                         <p class="text-slate-400 text-center py-4">保存された例文セットはありません</p>
                     </div>
                 </div>
@@ -181,7 +206,7 @@
 
             <!-- 右側：出力コンテンツエリア (8カラム) -->
             <div class="lg:col-span-8">
-                <div id="outputContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 min-h-[500px] flex flex-col">
+                <div id="outputContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 min-h-[550px] flex flex-col">
                     
                     <!-- 出力結果ヘッダー・ツールバー -->
                     <div class="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/70 rounded-t-xl">
@@ -192,21 +217,26 @@
                             <span id="activeSourceBadge" class="hidden text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-medium"></span>
                         </div>
 
-                        <!-- コントロール群 (ふりがな切替, 印刷, 保存, 結果クリア) -->
+                        <!-- コントロール群 (ふりがな切替, コピー, 保存, 結果クリア) -->
                         <div class="flex items-center gap-2 flex-wrap">
-                            <button id="toggleFuriganaBtn" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-sm transition">
+                            <button id="toggleFuriganaBtn" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-xs transition">
                                 <i data-lucide="languages" class="w-3.5 h-3.5 text-indigo-600"></i>
                                 <span id="furiganaBtnText">ふりがな: 表示</span>
                             </button>
 
-                            <button id="saveCurrentBtn" disabled class="bg-white border border-slate-300 hover:bg-slate-50 disabled:opacity-40 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-sm transition">
-                                <i data-lucide="bookmark" class="w-3.5 h-3.5 text-amber-500"></i>
-                                <span>保存</span>
+                            <button id="copyAllBtn" disabled class="bg-white border border-slate-300 hover:bg-slate-50 disabled:opacity-40 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-xs transition" title="全文をクリップボードにコピー">
+                                <i data-lucide="copy" class="w-3.5 h-3.5 text-slate-600"></i>
+                                <span>全文コピー</span>
                             </button>
 
-                            <button id="printBtn" disabled class="bg-white border border-slate-300 hover:bg-slate-50 disabled:opacity-40 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-sm transition">
-                                <i data-lucide="printer" class="w-3.5 h-3.5 text-slate-600"></i>
-                                <span>印刷/PDF</span>
+                            <button id="copyQuizBtn" disabled class="bg-white border border-slate-300 hover:bg-slate-50 disabled:opacity-40 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-xs transition" title="学生用テスト部分のみコピー">
+                                <i data-lucide="clipboard-list" class="w-3.5 h-3.5 text-indigo-600"></i>
+                                <span>テストのみコピー</span>
+                            </button>
+
+                            <button id="saveCurrentBtn" disabled class="bg-white border border-slate-300 hover:bg-slate-50 disabled:opacity-40 text-slate-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-xs transition">
+                                <i data-lucide="bookmark" class="w-3.5 h-3.5 text-amber-500"></i>
+                                <span>保存</span>
                             </button>
 
                             <!-- 生成結果のみ消去するクリアボタン -->
@@ -215,18 +245,6 @@
                                 <span>結果をクリア</span>
                             </button>
                         </div>
-                    </div>
-
-                    <!-- タブナビゲーション -->
-                    <div class="border-b border-slate-200 px-4 bg-slate-50/30 flex gap-6 text-sm">
-                        <button id="tabSentencesBtn" class="py-3 font-semibold text-indigo-600 border-b-2 border-indigo-600 flex items-center gap-1.5">
-                            <i data-lucide="file-text" class="w-4 h-4"></i>
-                            例文と解説
-                        </button>
-                        <button id="tabQuizBtn" class="py-3 font-semibold text-slate-500 border-b-2 border-transparent hover:text-slate-700 flex items-center gap-1.5">
-                            <i data-lucide="help-circle" class="w-4 h-4"></i>
-                            確認テストモード
-                        </button>
                     </div>
 
                     <!-- メイン表示ボディ -->
@@ -238,7 +256,7 @@
                                 <i data-lucide="search" class="w-8 h-8"></i>
                             </div>
                             <h3 class="text-sm font-semibold text-slate-600 mb-1">左側のフォームからキーワードを入力してください</h3>
-                            <p class="text-xs text-slate-400 max-w-sm mx-auto">JLPTレベルに合わせた自然な例文、英語訳、教師向け指導ポイント、4択テスト問題を自動作成します。</p>
+                            <p class="text-xs text-slate-400 max-w-sm mx-auto">JLPTレベルに合わせた自然な例文、英語訳、指導ポイント、穴埋め確認テスト（学生用・教師用解答）を作成します。</p>
                         </div>
 
                         <!-- ローディング表示 -->
@@ -246,7 +264,7 @@
                             <div class="inline-block animate-spin rounded-full h-9 w-9 border-4 border-indigo-600 border-t-transparent"></div>
                             <div>
                                 <p class="text-sm font-bold text-slate-800" id="loadingTitle">Gemini AI で例文とテストを生成中...</p>
-                                <p class="text-xs text-slate-500 mt-1" id="loadingSubtitle">対象語句・レベル・使用シーンに合わせた自然な文脈を構築しています</p>
+                                <p class="text-xs text-slate-500 mt-1" id="loadingSubtitle">対象項目・レベル・文脈に応じた自然な日本語を構成しています</p>
                             </div>
                         </div>
 
@@ -257,7 +275,7 @@
                             </div>
                             <div>
                                 <h3 class="text-base font-bold text-slate-800" id="errorTitle">Gemini AI による生成エラー</h3>
-                                <p class="text-xs text-rose-600 mt-1.5 leading-relaxed font-mono bg-rose-50 p-2.5 rounded-lg border border-rose-200 text-left" id="errorMessage">エラー内容</p>
+                                <p class="text-xs text-rose-600 mt-1.5 leading-relaxed font-mono bg-rose-50 p-2.5 rounded-lg border border-rose-200 text-left whitespace-pre-wrap" id="errorMessage">エラー内容</p>
                             </div>
                             <div class="flex items-center justify-center gap-2 pt-1">
                                 <button type="button" id="errorOpenKeyBtn" class="px-3.5 py-2 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow-sm transition flex items-center gap-1.5">
@@ -270,30 +288,9 @@
                             </div>
                         </div>
 
-                        <!-- タブ1: 例文表示コンテンツ -->
-                        <div id="sentencesContent" class="hidden space-y-6">
-                            <div id="sentencesList" class="space-y-4"></div>
-                        </div>
-
-                        <!-- タブ2: テストモードコンテンツ -->
-                        <div id="quizContent" class="hidden space-y-6">
-                            <div id="quizHeader" class="bg-indigo-50 p-4 rounded-lg border border-indigo-100 flex items-center justify-between">
-                                <div>
-                                    <h3 class="font-bold text-indigo-900 text-sm">理解度チェックテスト（学生用）</h3>
-                                    <p class="text-xs text-indigo-700">（ ）に入る最も適切な言葉を選んでください。</p>
-                                </div>
-                                <button id="submitQuizBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-4 py-2 rounded-lg transition shadow-sm">
-                                    採点する
-                                </button>
-                            </div>
-
-                            <div id="quizList" class="space-y-6"></div>
-
-                            <!-- 採点結果表示エリア -->
-                            <div id="quizResultScore" class="hidden bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
-                                <h4 class="text-lg font-bold text-emerald-800" id="scoreText">正解率: 0 / 0</h4>
-                                <p class="text-xs text-emerald-600 mt-0.5">お疲れ様でした！間違えた問題は解説を確認しましょう。</p>
-                            </div>
+                        <!-- 生成結果テキスト表示エリア -->
+                        <div id="outputContentContainer" class="hidden">
+                            <div id="outputContent" class="generated-content text-slate-800 leading-relaxed text-sm"></div>
                         </div>
 
                     </div>
@@ -302,32 +299,6 @@
 
         </div>
     </main>
-
-    <!-- 印刷専用レイアウト (ブラウザの印刷時のみ表示) -->
-    <div class="print-only p-8 max-w-3xl mx-auto">
-        <div class="text-center mb-6 pb-4 border-b-2 border-black">
-            <h1 class="text-2xl font-bold mb-1">日本語 理解度確認テスト</h1>
-            <div class="flex justify-between text-xs mt-4">
-                <span>対象: <span id="printKeywordText"></span> (<span id="printLevel">N4</span>)</span>
-                <span>日付: ______________</span>
-                <span>名前: ______________________</span>
-            </div>
-        </div>
-
-        <div class="mb-6">
-            <h2 class="font-bold text-sm mb-3">【問題】（ ）に入る最も適切なものを 1・2・3・4 から一つ選んでください。</h2>
-            <div id="printQuizList" class="space-y-4 text-sm"></div>
-        </div>
-
-        <div class="page-break"></div>
-
-        <div class="text-center mb-6 pb-4 border-b border-gray-400">
-            <h1 class="text-xl font-bold mb-1">例文・解答と指導のポイント（教師用）</h1>
-            <p class="text-xs">対象項目: <span id="printTeacherKeyword"></span></p>
-        </div>
-
-        <div id="printAnswersList" class="space-y-5 text-xs"></div>
-    </div>
 
     <!-- Gemini APIキー設定モーダル -->
     <div id="apiKeyModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
@@ -353,7 +324,7 @@
                     語句の品詞と文脈に応じた例文生成について
                 </p>
                 <p class="text-[11px] leading-relaxed text-amber-800">
-                    「身近」などの任意の語句を機械的な定型文に置換するのではなく、語句本来の品詞（な形容詞・名詞）や文脈（日常生活・学校・ビジネス等）に合わせた自然な例文と確認テストを生成するためにGemini APIを使用します。
+                    「身近」などの任意の語句を機械的な定型文に置換するのではなく、語句本来の品詞（な形容詞・名詞）や文脈に合わせた自然な例文と確認テストを生成するためにGemini APIを使用します。
                 </p>
             </div>
 
@@ -373,6 +344,15 @@
                         無料でAPIキーを取得 <i data-lucide="external-link" class="w-3 h-3"></i>
                     </a>
                 </div>
+
+                <!-- 接続テストボタン & ステータス表示 -->
+                <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" id="testApiKeyBtn" class="px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg border border-slate-300 transition flex items-center gap-1">
+                        <i data-lucide="activity" class="w-3.5 h-3.5 text-slate-500"></i>
+                        <span>接続テスト</span>
+                    </button>
+                    <span id="testApiStatus" class="text-xs text-slate-500"></span>
+                </div>
             </div>
 
             <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -387,138 +367,130 @@
         </div>
     </div>
 
-    <!-- フッター (印刷非表示) -->
-    <footer class="bg-slate-100 border-t border-slate-200 mt-auto py-4 text-center text-xs text-slate-500 no-print">
+    <!-- フッター -->
+    <footer class="bg-slate-100 border-t border-slate-200 mt-auto py-4 text-center text-xs text-slate-500">
         <p>© 日本語教育教材サポートツール - JLPT Level Compliant Generator</p>
     </footer>
 
     <!-- JavaScript ロジック -->
     <script>
         // ---- グローバル状態管理 ----
-        let currentData = null;
+        let currentData = null; // { keyword, level, context, count, source, rawText, createdAt }
         let savedItems = JSON.parse(localStorage.getItem('jp_generator_history') || '[]');
         let isFuriganaVisible = true;
-        let currentTab = 'sentences'; // 'sentences' or 'quiz'
 
         // ---- デモ用事前収録サンプル（オフライン・クイック体験用） ----
         const DEMO_PRESETS = {
-            "身近": {
-                examples: [
-                    {
-                        japanese: "環境(かんきょう)問題(もんだい)を、まず自分(じぶん)の身近(みぢか)なところから考(かんが)えてみましょう。",
-                        english: "Let's start thinking about environmental issues from our familiar surroundings.",
-                        teacherNote: "「身近な＋名詞」の形で、自分に近しい範囲・日常の事柄を表す連体修飾の用法です。「身近」はな形容詞（形状詞）として機能します。"
-                    },
-                    {
-                        japanese: "留学生(りゅうがくせい)向(む)けに、身近(みぢか)な例(れい)を使(つか)って日本(にほん)の生活(せいかつ)ルールを説明(せつめい)した。",
-                        english: "I explained Japanese daily life rules using familiar examples for international students.",
-                        teacherNote: "「身近な例」は学校や会話でよく使われる自然なコロケーションです。単なる語句の挿入ではなく品詞に応じた接続を指導します。"
-                    },
-                    {
-                        japanese: "コンビニやスーパーは、私(わたし)たちの生活(せいかつ)にとても身近(みぢか)な存在(そんざい)です。",
-                        english: "Convenience stores and supermarkets are very familiar parts of our daily lives.",
-                        teacherNote: "「〜に身近な存在」という結びつきです。助詞「に」との共起関係を確認します。"
-                    }
-                ],
-                quizzes: [
-                    {
-                        question: "ごみを減(へ)らすために、まず （　　） な ことから 始(はじ)めましょう。",
-                        options: ["1. 身近", "2. 身近に", "3. 身近の", "4. 身近で"],
-                        answer: 0,
-                        explanation: "後ろの「な こと」に接続する語幹として、な形容詞「身近」が入ります。"
-                    },
-                    {
-                        question: "先生(せんせい)は （　　） な 例(れい)を 出(だ)して、分(わ)かりやすく 教(おし)えてくれた。",
-                        options: ["1. 身近", "2. 身近さ", "3. 身近だ", "4. 身近と"],
-                        answer: 0,
-                        explanation: "名詞「例」を連体修飾する「身近な例」の語幹「身近」が正解です。"
-                    },
-                    {
-                        question: "スマートフォンは、だれにとっても （　　） な 道具(どうぐ)です。",
-                        options: ["1. 身近", "2. 身近で", "3. 身近な", "4. 身近に"],
-                        answer: 0,
-                        explanation: "「（　）な 道具」の空欄に入る語幹は「身近」です。"
-                    }
-                ]
-            },
-            "〜ないほうがいいです": {
-                examples: [
-                    {
-                        japanese: "熱(ねつ)があるときは、お風呂(ふろ)に入(はい)らないほうがいいですよ。",
-                        english: "You shouldn't take a bath when you have a fever.",
-                        teacherNote: "「〜ないほうがいい」は動詞のナイ形に接続します。強い助言・忠告になるため、目上の人へ直接使うのは避ける配慮も指導します。"
-                    },
-                    {
-                        japanese: "暗(くら)い部屋(へや)でスマートフォンを見(み)ないほうがいいです。目(め)が悪(わる)くなります。",
-                        english: "You'd better not look at your smartphone in a dark room. It will hurt your eyes.",
-                        teacherNote: "理由（〜が悪くなります）と一緒に提示することで、日常会話で自然に相手へ助言する練習ができます。"
-                    },
-                    {
-                        japanese: "明日(あした)は朝(あさ)早(はや)いですから、今夜(こんや)は夜更(よふ)かしをしないほうがいいです。",
-                        english: "Since tomorrow is an early morning, you shouldn't stay up late tonight.",
-                        teacherNote: "サ変動詞「する」のナイ形「しない」への接続を確認します。"
-                    }
-                ],
-                quizzes: [
-                    {
-                        question: "お腹(なか)が痛(いた)いですから、冷(つめ)たいものを （　　） ほうがいいです。",
-                        options: ["1. 飲まない", "2. 飲んだ", "3. 飲まなくて", "4. 飲みません"],
-                        answer: 0,
-                        explanation: "否定のアドバイス「〜ないほうがいい」は動詞のナイ形に接続するため「飲まない」が正解です。"
-                    },
-                    {
-                        question: "明日(あした)は試験(しけん)ですから、学校(がっこう)に遅(おく)れ （　　） ほうがいいですよ。",
-                        options: ["1. ない", "2. ないの", "3. ないで", "4. なかった"],
-                        answer: 0,
-                        explanation: "動詞ナイ形「遅れない」＋「ほうがいい」の接続です。"
-                    },
-                    {
-                        question: "風邪(かぜ)をひいたときは、無理(むり)を （　　） ほうがいいです。",
-                        options: ["1. しない", "2. して", "3. しなかった", "4. する"],
-                        answer: 0,
-                        explanation: "動詞「する」のナイ形は「しない」なので「しないほうがいい」が適切です。"
-                    }
-                ]
-            },
-            "検討する": {
-                examples: [
-                    {
-                        japanese: "新(あたら)しい企画(きかく)について、チーム全員(ぜんいん)で前向(まえむ)きに検討(けんとう)しています。",
-                        english: "The whole team is positively considering the new proposal.",
-                        teacherNote: "ビジネス場面で多用される「検討する」です。「考える」よりも改まった客観的・公式な表現であることを指導します。"
-                    },
-                    {
-                        japanese: "いただいたご提案(ていあん)は、社内(しゃない)でよく検討(けんとう)した上(うえ)でお返事(へんじ)いたします。",
-                        english: "We will reply after carefully considering your proposal internally.",
-                        teacherNote: "ビジネスメールや商談でよく使われる定番フレーズ「検討した上で」です。"
-                    },
-                    {
-                        japanese: "予算(よさん)の都合(つごう)により、計画(けいかく)の変更(へんこう)を検討(けんとう)する必要(ひつよう)があります。",
-                        english: "Due to budget constraints, we need to consider revising the plan.",
-                        teacherNote: "「〜を検討する必要がある」の形での問題提起の用法を練習します。"
-                    }
-                ],
-                quizzes: [
-                    {
-                        question: "会議(かいぎ)で 次(つぎ)のイベントの 企画(きかく)について （　　） することにしました。",
-                        options: ["1. 検討", "2. 復習", "3. 予習", "4. 遠慮"],
-                        answer: 0,
-                        explanation: "吟味・多角的に考究する意味には「検討」が最も適切です。"
-                    },
-                    {
-                        question: "その問題(もんだい)につきましては、現在(げんざい)社内(しゃない)で （　　） 中でございます。",
-                        options: ["1. 検討", "2. 見当", "3. 探検", "4. 調査済"],
-                        answer: 0,
-                        explanation: "ビジネスで頻出する「検討中（けんとうちゅう）」の表現です。"
-                    },
-                    {
-                        question: "新(あたら)しい方針(ほうしん)を （　　） する余地(よち)があります。",
-                        options: ["1. 検討", "2. 決定", "3. 考慮済", "4. 発見"],
-                        answer: 0,
-                        explanation: "「検討する余地がある」で、まだ議論や再考の可能性があることを表します。"
-                    }
-                ]
-            }
+            "身近": `#### ■ 例文と指導のポイント
+1. **[例文]**: 環境(かんきょう)問題(もんだい)を、まず自分(じぶん)の身近(みぢか)なところから考(かんが)えてみましょう。
+   - **[英語訳]**: Let's start thinking about environmental issues from our familiar surroundings.
+   - **[指導のポイント]**: 「身近な＋名詞」の形で、自分に近しい範囲や日常の事柄を表す連体修飾の用法です。「身近」はな形容詞（形状詞）として機能するため、接続に注意させます。
+
+2. **[例文]**: 留学生(りゅうがくせい)向(む)けに、身近(みぢか)な例(れい)を使(つか)って日本(にほん)の生活(せいかつ)ルールを説明(せつめい)した。
+   - **[英語訳]**: I explained Japanese daily life rules using familiar examples for international students.
+   - **[指導のポイント]**: 「身近な例」は学校や会話でよく使われる自然なコロケーションです。単なる語句の挿入ではなく品詞に応じた自然な接続を指導します。
+
+3. **[例文]**: コンビニやスーパーは、私(わたし)たちの生活(せいかつ)にとても身近(みぢか)な存在(そんざい)です。
+   - **[英語訳]**: Convenience stores and supermarkets are very familiar parts of our daily lives.
+   - **[指導のポイント]**: 「〜に身近な存在」という結びつきです。助詞「に」との共起関係を確認します。
+
+---
+
+#### ■ 理解度確認テスト（学生用）
+（ ）に入る最も適切なものを 1・2・3・4 から一つ選んでください。
+
+問1. ごみを減(へ)らすために、まず （　　） な ことから 始(はじ)めましょう。
+  1. 身近  2. 身近に  3. 身近の  4. 身近で
+
+問2. 先生(せんせい)は （　　） な 例(れい)を 出(だ)して、分(わ)かりやすく 教(おし)えてくれた。
+  1. 身近  2. 身近さ  3. 身近だ  4. 身近と
+
+問3. スマートフォンは、だれにとっても （　　） な 道具(どうぐ)です。
+  1. 身近  2. 身近で  3. 身近な  4. 身近に
+
+---
+
+#### ■ テストの解答と解説（教師用）
+- **問1の正解**: 1
+  - **解説**: 後ろの「な こと」に接続する語幹として、な形容詞「身近」が入ります。
+- **問2の正解**: 1
+  - **解説**: 名詞「例」を連体修飾する「身近な例」の語幹「身近」が正解です。
+- **問3の正解**: 1
+  - **解説**: 「（　）な 道具」の空欄に入る語幹は「身近」です。`,
+
+            "〜ないほうがいいです": `#### ■ 例文と指導のポイント
+1. **[例文]**: 熱(ねつ)があるときは、お風呂(ふろ)に入(はい)らないほうがいいですよ。
+   - **[英語訳]**: You shouldn't take a bath when you have a fever.
+   - **[指導のポイント]**: 「〜ないほうがいい」は動詞のナイ形に接続します。強い助言・忠告になるため、目上の人へ直接使うのは避ける配慮も指導します。
+
+2. **[例文]**: 暗(くら)い部屋(へや)でスマートフォンを見(み)ないほうがいいです。目(め)が悪(わる)くなります。
+   - **[英語訳]**: You'd better not look at your smartphone in a dark room. It will hurt your eyes.
+   - **[指導のポイント]**: 理由（〜が悪くなります）と一緒に提示することで、日常会話で自然に相手へ助言する練習ができます。
+
+3. **[例文]**: 明日(あした)は朝(あさ)早(はや)いですから、今夜(こんや)は夜更(よふ)かしをしないほうがいいです。
+   - **[英語訳]**: Since tomorrow is an early morning, you shouldn't stay up late tonight.
+   - **[指導のポイント]**: サ変動詞「する」のナイ形「しない」への接続を確認します。
+
+---
+
+#### ■ 理解度確認テスト（学生用）
+（ ）に入る最も適切なものを 1・2・3・4 から一つ選んでください。
+
+問1. お腹(なか)が痛(いた)いですから、冷(つめ)たいものを （　　） ほうがいいです。
+  1. 飲まない  2. 飲んだ  3. 飲まなくて  4. 飲みません
+
+問2. 明日(あした)は試験(しけん)ですから、学校(がっこう)に遅(おく)れ （　　） ほうがいいですよ。
+  1. ない  2. ないの  3. ないで  4. なかった
+
+問3. 風邪(かぜ)をひいたときは、無理(むり)を （　　） ほうがいいです。
+  1. しない  2. して  3. しなかった  4. する
+
+---
+
+#### ■ テストの解答と解説（教師用）
+- **問1の正解**: 1
+  - **解説**: 否定のアドバイス「〜ないほうがいい」は動詞のナイ形に接続するため「飲まない」が正解です。
+- **問2の正解**: 1
+  - **解説**: 動詞ナイ形「遅れない」＋「ほうがいい」の接続です。「ないで」は「〜ないでください」との混同誤用です。
+- **問3の正解**: 1
+  - **解説**: 動詞「する」のナイ形は「しない」なので「しないほうがいい」が適切です。`,
+
+            "検討する": `#### ■ 例文と指導のポイント
+1. **[例文]**: 新(あたら)しい企画(きかく)について、チーム全員(ぜんいん)で前向(まえむ)きに検討(けんとう)しています。
+   - **[英語訳]**: The whole team is positively considering the new proposal.
+   - **[指導のポイント]**: ビジネス場面で多用される「検討する」です。「考える」よりも改まった客観的・公式な表現であることを指導します。
+
+2. **[例文]**: いただいたご提案(ていあん)は、社内(しゃない)でよく検討(けんとう)した上(うえ)でお返事(へんじ)いたします。
+   - **[英語訳]**: We will reply after carefully considering your proposal internally.
+   - **[指導のポイント]**: ビジネスメールや商談でよく使われる定番フレーズ「検討した上で」です。
+
+3. **[例文]**: 予算(よさん)の都合(つごう)により、計画(けいかく)の変更(へんこう)を検討(けんとう)する必要(ひつよう)があります。
+   - **[英語訳]**: Due to budget constraints, we need to consider revising the plan.
+   - **[指導のポイント]**: 「〜を検討する必要がある」の形での問題提起の用法を練習します。
+
+---
+
+#### ■ 理解度確認テスト（学生用）
+（ ）に入る最も適切なものを 1・2・3・4 から一つ選んでください。
+
+問1. 会議(かいぎ)で 次(つぎ)のイベントの 企画(きかく)について （　　） することにしました。
+  1. 検討  2. 復習  3. 予習  4. 遠慮
+
+問2. その問題(もんだい)につきましては、現在(げんざい)社内(しゃない)で （　　） 中でございます。
+  1. 検討  2. 見当  3. 探検  4. 調査済
+
+問3. 新(あたら)しい方針(ほうしん)を （　　） する余地(よち)があります。
+  1. 検討  2. 決定  3. 考慮済  4. 発見
+
+---
+
+#### ■ テストの解答と解説（教師用）
+- **問1の正解**: 1
+  - **解説**: 吟味・多角的に考究する意味には「検討」が最も適切です。
+- **問2の正解**: 1
+  - **解説**: ビジネスで頻出する「検討中（けんとうちゅう）」の表現です。
+- **問3の正解**: 1
+  - **解説**: 「検討する余地がある」で、まだ議論や再考の可能性があることを表します。`
         };
 
         // ---- DOM要素参照 ----
@@ -528,6 +500,8 @@
         const closeApiKeyModalBtn = document.getElementById('closeApiKeyModalBtn');
         const cancelApiKeyBtn = document.getElementById('cancelApiKeyBtn');
         const modalApiKeyInput = document.getElementById('modalApiKeyInput');
+        const testApiKeyBtn = document.getElementById('testApiKeyBtn');
+        const testApiStatus = document.getElementById('testApiStatus');
         const saveAndGenerateModalBtn = document.getElementById('saveAndGenerateModalBtn');
         const toggleApiKeyVisibilityBtn = document.getElementById('toggleApiKeyVisibilityBtn');
         const eyeIcon = document.getElementById('eyeIcon');
@@ -548,11 +522,10 @@
         const activeSourceBadge = document.getElementById('activeSourceBadge');
         const toggleFuriganaBtn = document.getElementById('toggleFuriganaBtn');
         const furiganaBtnText = document.getElementById('furiganaBtnText');
+        const copyAllBtn = document.getElementById('copyAllBtn');
+        const copyQuizBtn = document.getElementById('copyQuizBtn');
         const saveCurrentBtn = document.getElementById('saveCurrentBtn');
-        const printBtn = document.getElementById('printBtn');
 
-        const tabSentencesBtn = document.getElementById('tabSentencesBtn');
-        const tabQuizBtn = document.getElementById('tabQuizBtn');
         const placeholderState = document.getElementById('placeholderState');
         const loadingState = document.getElementById('loadingState');
         const loadingTitle = document.getElementById('loadingTitle');
@@ -562,20 +535,9 @@
         const errorOpenKeyBtn = document.getElementById('errorOpenKeyBtn');
         const errorRetryBtn = document.getElementById('errorRetryBtn');
 
-        const sentencesContent = document.getElementById('sentencesContent');
-        const sentencesList = document.getElementById('sentencesList');
-        const quizContent = document.getElementById('quizContent');
-        const quizList = document.getElementById('quizList');
-        const submitQuizBtn = document.getElementById('submitQuizBtn');
-        const quizResultScore = document.getElementById('quizResultScore');
-        const scoreText = document.getElementById('scoreText');
+        const outputContentContainer = document.getElementById('outputContentContainer');
+        const outputContent = document.getElementById('outputContent');
         const contentWrapper = document.getElementById('contentWrapper');
-
-        const printLevel = document.getElementById('printLevel');
-        const printKeywordText = document.getElementById('printKeywordText');
-        const printTeacherKeyword = document.getElementById('printTeacherKeyword');
-        const printQuizList = document.getElementById('printQuizList');
-        const printAnswersList = document.getElementById('printAnswersList');
 
         // ---- 初期化処理 ----
         function init() {
@@ -587,7 +549,7 @@
 
         // ---- APIキー関連モーダル・UI制御 ----
         function updateApiKeyUI() {
-            const key = (localStorage.getItem('gemini_api_key') || '').trim();
+            const key = (localStorage.getItem('gemini_api_key') || '').replace(/["'\r\n\s]/g, '');
             if (key) {
                 headerApiKeyStatus.textContent = "Gemini API 設定済 ✓";
                 headerApiKeyStatus.className = "text-emerald-200 font-semibold";
@@ -623,8 +585,49 @@
             lucide.createIcons();
         }
 
+        async function testApiKeyConnection() {
+            const rawKey = modalApiKeyInput.value || localStorage.getItem('gemini_api_key') || '';
+            const key = rawKey.replace(/["'\r\n\s]/g, '');
+            if (!key) {
+                testApiStatus.textContent = "⚠ キーを入力してください";
+                testApiStatus.className = "text-xs text-amber-600 font-medium";
+                return;
+            }
+
+            testApiStatus.textContent = "接続確認中...";
+            testApiStatus.className = "text-xs text-slate-500 font-medium";
+
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`;
+                const res = await fetch(url);
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    const msg = errData.error?.message || `HTTP ${res.status}`;
+                    if (res.status === 400 && (msg.includes('API_KEY_INVALID') || msg.includes('API key not valid'))) {
+                        testApiStatus.textContent = "✕ APIキーが無効です";
+                        testApiStatus.className = "text-xs text-rose-600 font-bold";
+                        return;
+                    }
+                    testApiStatus.textContent = `✕ 失敗: ${msg}`;
+                    testApiStatus.className = "text-xs text-rose-600 font-medium";
+                    return;
+                }
+
+                const data = await res.json();
+                const modelNames = (data.models || []).map(m => m.name.replace('models/', ''));
+                const hasFlash = modelNames.some(m => m.includes('flash'));
+                testApiStatus.textContent = hasFlash 
+                    ? `✓ 接続成功！利用可能: ${modelNames.filter(m => m.includes('flash')).slice(0, 2).join(', ')}` 
+                    : `✓ 接続成功 (${modelNames.length}個のモデル)`;
+                testApiStatus.className = "text-xs text-emerald-600 font-bold";
+            } catch (err) {
+                testApiStatus.textContent = `✕ 通信エラー: ${err.message}`;
+                testApiStatus.className = "text-xs text-rose-600 font-medium";
+            }
+        }
+
         function saveAndGenerateFromModal() {
-            const key = (modalApiKeyInput.value || '').trim();
+            const key = (modalApiKeyInput.value || '').replace(/["'\r\n\s]/g, '');
             if (key) {
                 localStorage.setItem('gemini_api_key', key);
                 updateApiKeyUI();
@@ -641,6 +644,7 @@
         cancelApiKeyBtn.addEventListener('click', closeApiKeyModal);
         toggleApiKeyVisibilityBtn.addEventListener('click', toggleApiKeyVisibility);
         saveAndGenerateModalBtn.addEventListener('click', saveAndGenerateFromModal);
+        testApiKeyBtn.addEventListener('click', testApiKeyConnection);
         errorOpenKeyBtn.addEventListener('click', openApiKeyModal);
         errorRetryBtn.addEventListener('click', handleGenerate);
 
@@ -667,36 +671,6 @@
             return text.replace(/([一-龯々ヶ]+)\(([^)]+)\)/g, '<ruby>$1<rt>$2</rt></ruby>');
         }
 
-        function stripRuby(text) {
-            if (!text) return '';
-            return text.replace(/<ruby>(.*?)<rt>.*?<\/rt><\/ruby>/g, '$1')
-                       .replace(/([一-龯々ヶ]+)\(([^)]+)\)/g, '$1');
-        }
-
-        // ---- タブ切り替え ----
-        tabSentencesBtn.addEventListener('click', () => switchTab('sentences'));
-        tabQuizBtn.addEventListener('click', () => switchTab('quiz'));
-
-        function switchTab(tab) {
-            currentTab = tab;
-            if (tab === 'sentences') {
-                tabSentencesBtn.className = "py-3 font-semibold text-indigo-600 border-b-2 border-indigo-600 flex items-center gap-1.5";
-                tabQuizBtn.className = "py-3 font-semibold text-slate-500 border-b-2 border-transparent hover:text-slate-700 flex items-center gap-1.5";
-                if (currentData) {
-                    sentencesContent.classList.remove('hidden');
-                    quizContent.classList.add('hidden');
-                }
-            } else {
-                tabQuizBtn.className = "py-3 font-semibold text-indigo-600 border-b-2 border-indigo-600 flex items-center gap-1.5";
-                tabSentencesBtn.className = "py-3 font-semibold text-slate-500 border-b-2 border-transparent hover:text-slate-700 flex items-center gap-1.5";
-                if (currentData) {
-                    quizContent.classList.remove('hidden');
-                    sentencesContent.classList.add('hidden');
-                }
-            }
-            lucide.createIcons();
-        }
-
         // ---- ふりがな表示切り替え ----
         toggleFuriganaBtn.addEventListener('click', () => {
             isFuriganaVisible = !isFuriganaVisible;
@@ -709,61 +683,61 @@
             }
         });
 
-        // ---- 手順２：Gemini API 生成プロンプト構築 ----
+        // ---- プロンプト構築（ユーザー指定プロンプトに完全準拠） ----
         function buildPrompt(keyword, level, context, count) {
             return `あなたは日本語教育（日本語教師）のプロフェッショナルです。
-留学生などの日本語学習者に向けて、指定された語句（語彙・文法項目）を使った、文脈に即した自然で実践的な例文と、学習内容を確認するための4択穴埋めテスト問題を作成してください。
+留学生などの日本語学習者に向けて、指定された「語彙・文法項目」を使った例文と、学習内容を確認するための「穴埋めテスト問題」を作成してください。
 
 ### 【入力条件】
-- 検索・対象語句: 「${keyword}」
+- 検索・対象項目: ${keyword}
 - 学習者レベル: ${level}
-- 指定された利用場面・使用シーン: ${context}
-- 作成件数: ${count}件
+- 利用場面・文脈: ${context}
+- 例文の作成数: ${count}件
 
-### 【作成・出力のルール（※厳格遵守）】
-1. **語句の品詞・性質に応じた自然な文の生成（※単なる穴埋め置換の完全禁止）**:
-   - 語句「${keyword}」をテンプレート文に機械的に当てはめること（例：「〜を正しく使うことが大切です」等）は【絶対に禁止】です。
-   - 「${keyword}」の本来の品詞（名詞、な形容詞、い形容詞、動詞、副詞、文法連語など）を正確に分析し、日本語として極めて自然なコロケーション（共起表現）を用いて文を作成してください。
-   （例：「身近」であれば な形容詞・名詞として「身近(みぢか)な問題(もんだい)」「身近(みぢか)に感(かん)じる」「身近(みぢか)な例(れい)」等の自然な形で使用する）
-2. **指定場面（${context}）への完全合致**:
-   - 必ず指定された場面（${context}）に即した具体的なシチュエーション（会話、体験、業務、学校生活など）を描写した文にしてください。
-3. **学習者レベル（${level}）の厳格な準拠**:
-   - 文中の語彙、文法、漢字はすべて ${level} の学習者がすでに習得している、または理解できる範囲に限定してください。指定レベルを超える難読漢字や高度な語彙は避けてください。
-4. **ルビ（ふりがな）の表記**:
+### 【作成・出力のルール】
+1. **語彙・文法レベルの厳守**:
+   - 指定されたJLPTレベル（${level}）の学習者がすでに習得している、または理解できる語彙や漢字・文法のみを使用してください。指定レベルを超えた難しい語彙や複雑な漢字は使わないでください。
+2. **ルビ（ふりがな）の表記**:
    - 漢字にはすべて、漢字(かんじ) のように括弧でルビ（読み方）をつけてください。
-5. **教師向け指導ポイント**:
-   - 各例文について、日本語教師が指導する際のポイント（品詞の接続、よくある留学生の誤用、ニュアンス）を明記してください。
-6. **確認テストの作成**:
-   - 生成した例文をベースに、「${keyword}」の定着度を測る「4択の穴埋め問題」を例文と同数作成してください。
-   - 誤答の選択肢（ダミー）にも学習者が典型的に間違えやすい文法・形態（助詞の誤用、テ形・タ形の混同、異なる品詞接続など）を入れてください。
+3. **自然で実用的な文脈**:
+   - 留学生が実際の生活や教室でそのまま使える、文脈が分かりやすい自然な日本語にしてください。
+4. **確認テストの作成**:
+   - 生成した例文をベースに、指定項目（${keyword}）の定着度を測る「4択の穴埋め問題」を例文と同数作成してください。誤答の選択肢（ダミー）も学習者がよく間違えやすい文法・形態（例：ナイ形とタ形の誤用など）を入れてください。
 
-### 【返却フォーマット】
-必ず以下のJSON形式のみを出力してください。Markdownのコードブロックや余計な解説は不要です。
-{
-  "examples": [
-    {
-      "japanese": "漢字(かんじ)にルビをつけた自然な例文",
-      "english": "英語訳",
-      "teacherNote": "教師向けの指導ポイント・解説・よくある誤用"
-    }
-  ],
-  "quizzes": [
-    {
-      "question": "（　）の入った問題文。漢字には漢字(かんじ)とルビを付与",
-      "options": ["1. 選択肢1", "2. 選択肢2", "3. 選択肢3", "4. 選択肢4"],
-      "answer": 0,
-      "explanation": "正解の根拠と指導解説"
-    }
-  ]
-}
-※ answer は 正解の選択肢のインデックス（0, 1, 2, 3 のいずれか）を指定してください。`;
+---
+
+### 【出力フォーマット】
+
+#### ■ 例文と指導のポイント
+1. **[例文]**: {ふりがな付きの例文}
+   - **[英語訳]**: {英語の対訳}
+   - **[指導のポイント]**: {教師向けの簡単な解説や、導入時の注意点・よくある誤用}
+
+2. **[例文]**: ...
+（指定された件数分繰り返し）
+
+---
+
+#### ■ 理解度確認テスト（学生用）
+（ ）に入る最も適切なものを 1・2・3・4 から一つ選んでください。
+
+問1. {穴埋め問題文}
+  1. {選択肢1} 2. {選択肢2} 3. {選択肢3} 4. {選択肢4}
+
+問2. ...
+
+---
+
+#### ■ テストの解答と解説（教師用）
+- **問1の正解**: {正解番号}
+  - **解説**: {なぜその選択肢になるのかの短い解説}
+- **問2の正解**: ...`;
         }
 
-        // ---- 手順１〜３：生成処理メインパイプライン ----
+        // ---- 生成処理メインパイプライン ----
         async function handleGenerate(e) {
             if (e) e.preventDefault();
 
-            // 手順１：検索項目、レベル、使用シーンの取得
             let keyword = keywordInput.value.trim();
             if (!keyword) {
                 keywordInput.focus();
@@ -774,7 +748,7 @@
             const level = jlptLevelSelect.value;
             const context = contextCategorySelect.value;
             const count = parseInt(sentenceCountSelect.value, 10) || 3;
-            const apiKey = (localStorage.getItem('gemini_api_key') || '').trim();
+            const apiKey = (localStorage.getItem('gemini_api_key') || '').replace(/["'\r\n\s]/g, '');
 
             // APIキーの有無を確認
             if (!apiKey) {
@@ -788,52 +762,44 @@
                         context,
                         count,
                         source: "事前収録デモ",
-                        createdAt: new Date().toISOString(),
-                        ...demoMatch
+                        rawText: demoMatch,
+                        createdAt: new Date().toISOString()
                     };
-                    switchTab('sentences');
                     renderOutput(currentData);
-                    saveCurrentBtn.disabled = false;
-                    printBtn.disabled = false;
                     showToast("※事前収録デモを表示しました。Gemini AI生成を行うには右上の「Gemini API 設定」を行ってください。");
                     return;
                 }
 
-                // 自由入力語句（例：「身近」等）は機械的置換をせず、Gemini APIキーの入力を促す
+                // 自由入力語句はGemini APIキーの入力を促す
                 openApiKeyModal();
                 showToast(`「${keyword}」の例文をGeminiで生成するため、APIキーを入力してください`);
                 return;
             }
 
-            // 手順２：語句を使った例文をGeminiを使用して生成
+            // Gemini APIを使用して生成
             placeholderState.classList.add('hidden');
-            sentencesContent.classList.add('hidden');
-            quizContent.classList.add('hidden');
+            outputContentContainer.classList.add('hidden');
             errorState.classList.add('hidden');
             loadingState.classList.remove('hidden');
 
             loadingTitle.textContent = `Gemini AI で「${keyword}」の例文とテストを生成中...`;
-            loadingSubtitle.textContent = `レベル: ${level} ｜ 使用シーン: ${context} に適した自然な日本語を構成しています`;
+            loadingSubtitle.textContent = `レベル: ${level} ｜ 利用場面: ${context} に適した自然な日本語を構成しています`;
             generateBtn.disabled = true;
 
             try {
-                const data = await fetchFromGemini(apiKey, keyword, level, context, count);
+                const text = await fetchFromGemini(apiKey, keyword, level, context, count);
 
-                // 手順３：例文を表示
                 currentData = {
                     keyword,
                     level,
                     context,
                     count,
                     source: "Gemini AI",
-                    createdAt: new Date().toISOString(),
-                    ...data
+                    rawText: text,
+                    createdAt: new Date().toISOString()
                 };
 
-                switchTab('sentences');
                 renderOutput(currentData);
-                saveCurrentBtn.disabled = false;
-                printBtn.disabled = false;
                 showToast(`Gemini AI により「${keyword}」の例文とテストを生成しました`);
 
                 const outputEl = document.getElementById('outputContainer');
@@ -858,10 +824,24 @@
         generateBtn.addEventListener('click', handleGenerate);
 
         // ---- Gemini API 呼び出し（モデル自動フォールバック対応） ----
-        async function fetchFromGemini(apiKey, keyword, level, context, count) {
+        async function fetchFromGemini(rawApiKey, keyword, level, context, count) {
+            const apiKey = (rawApiKey || '').replace(/["'\r\n\s]/g, '');
+            if (!apiKey) {
+                throw new Error("Gemini APIキーが設定されていません。右上の「Gemini API 設定」からキーを入力してください。");
+            }
+
             const prompt = buildPrompt(keyword, level, context, count);
-            const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
-            let lastError = null;
+            const models = [
+                'gemini-1.5-flash',
+                'gemini-1.5-flash-latest',
+                'gemini-1.5-flash-001',
+                'gemini-1.5-flash-002',
+                'gemini-2.0-flash-exp',
+                'gemini-2.0-flash',
+                'gemini-1.5-pro'
+            ];
+
+            let attemptErrors = [];
 
             for (const model of models) {
                 try {
@@ -870,48 +850,42 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            contents: [{ parts: [{ text: prompt }] }],
-                            generationConfig: {
-                                response_mime_type: "application/json"
-                            }
+                            contents: [{ parts: [{ text: prompt }] }]
                         })
                     });
 
                     if (!response.ok) {
                         const errData = await response.json().catch(() => ({}));
                         const errMsg = errData.error?.message || `HTTP ${response.status}`;
-                        if (response.status === 404) {
-                            lastError = new Error(`モデル ${model} が利用できません`);
-                            continue;
+
+                        if (response.status === 400 && (errMsg.includes('API_KEY_INVALID') || errMsg.includes('API key not valid'))) {
+                            throw new Error("【APIキー無効】入力されたGemini APIキーが正しくありません。Google AI Studio（https://aistudio.google.com/app/apikey）で発行したキーをご確認ください。");
                         }
-                        if (response.status === 400 && errMsg.includes('API_KEY_INVALID')) {
-                            throw new Error("Gemini APIキーが無効です。Google AI Studioで正しいAPIキーを取得して設定してください。");
+                        if (response.status === 403) {
+                            throw new Error(`【権限エラー】APIキーのアクセス権限またはGenerative Language APIの有効化を確認してください (${errMsg})`);
                         }
-                        throw new Error(errMsg);
+                        if (response.status === 429) {
+                            throw new Error("【利用制限】APIのリクエスト上限に達しました。数十秒待ってから再試行してください。");
+                        }
+
+                        attemptErrors.push(`[${model}] ${errMsg}`);
+                        continue;
                     }
 
                     const resJson = await response.json();
                     const textContent = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
                     if (!textContent) throw new Error("Geminiからの応答が空でした");
 
-                    // Markdownコードフェンス (```json ... ```) の除去処理
-                    let cleanJson = textContent.trim();
-                    if (cleanJson.startsWith('```')) {
-                        cleanJson = cleanJson.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-                    }
-
-                    const parsed = JSON.parse(cleanJson);
-                    if (!parsed.examples || !Array.isArray(parsed.examples)) {
-                        throw new Error("Geminiから返却されたデータ構造が不正です");
-                    }
-
-                    return parsed;
+                    return textContent.trim();
                 } catch (err) {
-                    lastError = err;
-                    if (err.message.includes('APIキーが無効')) throw err;
+                    if (err.message.includes('【APIキー無効】') || err.message.includes('【権限エラー】') || err.message.includes('【利用制限】')) {
+                        throw err;
+                    }
+                    attemptErrors.push(err.message);
                 }
             }
-            throw lastError || new Error("Gemini APIの通信に失敗しました");
+
+            throw new Error(`全Geminiモデルへの接続に失敗しました:\n${attemptErrors[0] || 'モデルが利用できません'}\n※Google AI Studioで新しいAPIキーを再作成することをおすすめします。`);
         }
 
         // ---- 描画処理 ----
@@ -924,209 +898,83 @@
 
             if (activeSourceBadge) {
                 const isGemini = data.source === "Gemini AI";
-                activeSourceBadge.textContent = data.source || "内蔵スマートエンジン";
+                activeSourceBadge.textContent = data.source || "Gemini AI";
                 activeSourceBadge.className = isGemini 
                     ? "text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium"
                     : "text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-medium";
                 activeSourceBadge.classList.remove('hidden');
             }
 
-            // 1. 例文のレンダリング
-            sentencesList.innerHTML = '';
-            data.examples.forEach((ex, idx) => {
-                const card = document.createElement('div');
-                card.className = "p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2 hover:border-indigo-200 transition";
-                card.innerHTML = `
-                    <div class="flex items-start gap-3">
-                        <span class="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center mt-0.5">
-                            ${idx + 1}
-                        </span>
-                        <div class="space-y-1.5 flex-grow">
-                            <div class="text-base font-medium text-slate-900 leading-relaxed">
-                                ${formatRuby(ex.japanese)}
-                            </div>
-                            <div class="text-xs text-slate-500 font-sans">
-                                <span class="font-semibold text-slate-600">訳:</span> ${escapeHtml(ex.english)}
-                            </div>
-                            <div class="mt-2 text-xs bg-amber-50/80 border border-amber-200/80 rounded-lg p-2.5 text-amber-900">
-                                <span class="font-bold flex items-center gap-1 mb-0.5 text-amber-800">
-                                    <i data-lucide="graduation-cap" class="w-3.5 h-3.5"></i> 指導のポイント
-                                </span>
-                                ${escapeHtml(ex.teacherNote)}
-                            </div>
-                        </div>
-                    </div>
-                `;
-                sentencesList.appendChild(card);
-            });
+            // Markdownパース & ルビタグ変換
+            const raw = data.rawText || '';
+            const rubyText = formatRuby(raw);
 
-            // 2. クイズのレンダリング
-            quizList.innerHTML = '';
-            quizResultScore.classList.add('hidden');
-            submitQuizBtn.disabled = false;
-            submitQuizBtn.textContent = "採点する";
-
-            data.quizzes.forEach((quiz, qIdx) => {
-                const qCard = document.createElement('div');
-                qCard.className = "quiz-question-card p-4 border border-slate-200 rounded-xl space-y-3 bg-white shadow-xs";
-                qCard.dataset.questionIndex = qIdx;
-
-                const optionsHtml = quiz.options.map((opt, optIdx) => `
-                    <label class="quiz-option-label flex items-center gap-3 p-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer text-xs transition">
-                        <input type="radio" name="quiz_q_${qIdx}" value="${optIdx}" class="text-indigo-600 focus:ring-indigo-500">
-                        <span class="font-medium text-slate-800">${escapeHtml(opt)}</span>
-                    </label>
-                `).join('');
-
-                qCard.innerHTML = `
-                    <div class="font-bold text-sm text-slate-800 flex items-start gap-2">
-                        <span class="text-indigo-600">問${qIdx + 1}.</span>
-                        <div class="leading-relaxed">${formatRuby(quiz.question)}</div>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                        ${optionsHtml}
-                    </div>
-                    <div class="quiz-explanation hidden mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1">
-                        <div class="font-bold text-slate-800 flex items-center gap-1.5">
-                            <span class="result-icon"></span>
-                            <span>正解: <span class="font-semibold text-indigo-600">${quiz.options[quiz.answer] || ''}</span></span>
-                        </div>
-                        <p class="text-slate-600 text-[11px] leading-relaxed">${escapeHtml(quiz.explanation)}</p>
-                    </div>
-                `;
-                quizList.appendChild(qCard);
-            });
-
-            // 印刷用データのセット
-            preparePrintView(data);
-
-            // 表示切り替え
-            if (currentTab === 'sentences') {
-                sentencesContent.classList.remove('hidden');
-                quizContent.classList.add('hidden');
+            let html = '';
+            if (typeof marked !== 'undefined') {
+                html = marked.parse(rubyText);
             } else {
-                quizContent.classList.remove('hidden');
-                sentencesContent.classList.add('hidden');
+                html = escapeHtml(rubyText).replace(/\n/g, '<br>');
             }
+
+            outputContent.innerHTML = html;
+            placeholderState.classList.add('hidden');
+            errorState.classList.add('hidden');
+            outputContentContainer.classList.remove('hidden');
+
+            // ボタン有効化
+            copyAllBtn.disabled = false;
+            copyQuizBtn.disabled = false;
+            saveCurrentBtn.disabled = false;
 
             lucide.createIcons();
         }
 
-        // ---- クイズ採点 ----
-        submitQuizBtn.addEventListener('click', () => {
-            if (!currentData || !currentData.quizzes) return;
-
-            let correctCount = 0;
-            const total = currentData.quizzes.length;
-
-            currentData.quizzes.forEach((quiz, qIdx) => {
-                const card = quizList.querySelector(`[data-question-index="${qIdx}"]`);
-                if (!card) return;
-
-                const selected = card.querySelector(`input[name="quiz_q_${qIdx}"]:checked`);
-                const userVal = selected ? parseInt(selected.value, 10) : -1;
-                const isCorrect = userVal === quiz.answer;
-                if (isCorrect) correctCount++;
-
-                const explanationEl = card.querySelector('.quiz-explanation');
-                const resultIcon = card.querySelector('.result-icon');
-                explanationEl.classList.remove('hidden');
-
-                const optionLabels = card.querySelectorAll('.quiz-option-label');
-                optionLabels.forEach((label, idx) => {
-                    label.classList.remove('bg-emerald-50', 'border-emerald-500', 'bg-rose-50', 'border-rose-400');
-                    if (idx === quiz.answer) {
-                        label.classList.add('bg-emerald-50', 'border-emerald-500', 'text-emerald-900', 'font-bold');
-                    } else if (idx === userVal && !isCorrect) {
-                        label.classList.add('bg-rose-50', 'border-rose-400', 'text-rose-900');
-                    }
-                });
-
-                if (isCorrect) {
-                    resultIcon.innerHTML = `<span class="inline-flex items-center text-emerald-600 font-bold"><i data-lucide="check-circle-2" class="w-4 h-4 mr-1"></i> 正解！</span>`;
-                } else {
-                    resultIcon.innerHTML = `<span class="inline-flex items-center text-rose-600 font-bold"><i data-lucide="x-circle" class="w-4 h-4 mr-1"></i> 不正解</span>`;
-                }
-            });
-
-            scoreText.textContent = `正解数: ${correctCount} / ${total} （正答率 ${Math.round((correctCount / total) * 100)}%）`;
-            quizResultScore.classList.remove('hidden');
-
-            // 全問正解時の紙吹雪
-            if (correctCount === total && total > 0 && typeof confetti === 'function') {
-                confetti({
-                    particleCount: 80,
-                    spread: 70,
-                    origin: { y: 0.6 }
-                });
+        // ---- コピー機能 ----
+        copyAllBtn.addEventListener('click', async () => {
+            if (!currentData || !currentData.rawText) return;
+            try {
+                await navigator.clipboard.writeText(currentData.rawText);
+                showToast("全文をクリップボードにコピーしました");
+            } catch (err) {
+                fallbackCopy(currentData.rawText);
             }
-
-            lucide.createIcons();
         });
 
-        // ---- 印刷用ビューの作成 ----
-        function preparePrintView(data) {
-            printLevel.textContent = data.level;
-            printKeywordText.textContent = data.keyword;
-            printTeacherKeyword.textContent = `${data.keyword} (${data.level})`;
-
-            // 問題シート
-            printQuizList.innerHTML = '';
-            data.quizzes.forEach((quiz, idx) => {
-                const item = document.createElement('div');
-                item.className = "pb-3 border-b border-gray-200";
-                item.innerHTML = `
-                    <div class="font-medium mb-1.5">問${idx + 1}. ${formatRuby(quiz.question)}</div>
-                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 pl-4">
-                        ${quiz.options.map(opt => `<div>${escapeHtml(opt)}</div>`).join('')}
-                    </div>
-                `;
-                printQuizList.appendChild(item);
-            });
-
-            // 解答＆解説シート
-            printAnswersList.innerHTML = '';
+        copyQuizBtn.addEventListener('click', async () => {
+            if (!currentData || !currentData.rawText) return;
+            // 「■ 理解度確認テスト（学生用）」から「■ テストの解答と解説」の手前までを抽出
+            const text = currentData.rawText;
+            const startIdx = text.indexOf('#### ■ 理解度確認テスト（学生用）');
+            const endIdx = text.indexOf('#### ■ テストの解答と解説（教師用）');
             
-            // 例文一覧
-            const exHeader = document.createElement('h3');
-            exHeader.className = "font-bold text-sm mb-2 border-b border-gray-300 pb-1";
-            exHeader.textContent = "■ 提示用例文と指導ポイント";
-            printAnswersList.appendChild(exHeader);
+            let quizText = '';
+            if (startIdx !== -1 && endIdx !== -1) {
+                quizText = text.substring(startIdx, endIdx).replace(/---+\s*$/, '').trim();
+            } else if (startIdx !== -1) {
+                quizText = text.substring(startIdx).trim();
+            } else {
+                quizText = text;
+            }
 
-            data.examples.forEach((ex, idx) => {
-                const exDiv = document.createElement('div');
-                exDiv.className = "mb-3 pl-2";
-                exDiv.innerHTML = `
-                    <p class="font-semibold text-sm">${idx + 1}. ${formatRuby(ex.japanese)}</p>
-                    <p class="text-gray-600">訳: ${escapeHtml(ex.english)}</p>
-                    <p class="text-gray-800 bg-gray-50 p-1.5 rounded mt-0.5 border border-gray-200">
-                        <strong>【指導ポイント】</strong> ${escapeHtml(ex.teacherNote)}
-                    </p>
-                `;
-                printAnswersList.appendChild(exDiv);
-            });
-
-            // クイズ解答
-            const quizAnsHeader = document.createElement('h3');
-            quizAnsHeader.className = "font-bold text-sm mt-4 mb-2 border-b border-gray-300 pb-1";
-            quizAnsHeader.textContent = "■ 確認テスト 解答と解説";
-            printAnswersList.appendChild(quizAnsHeader);
-
-            data.quizzes.forEach((q, idx) => {
-                const qDiv = document.createElement('div');
-                qDiv.className = "mb-3 pl-2";
-                qDiv.innerHTML = `
-                    <p class="font-semibold">問${idx + 1}の正解: <span class="text-blue-700">${q.options[q.answer] || ''}</span></p>
-                    <p class="text-gray-600 mt-0.5"><strong>解説:</strong> ${escapeHtml(q.explanation)}</p>
-                `;
-                printAnswersList.appendChild(qDiv);
-            });
-        }
-
-        printBtn.addEventListener('click', () => {
-            if (!currentData) return;
-            window.print();
+            try {
+                await navigator.clipboard.writeText(quizText);
+                showToast("学生用テストをクリップボードにコピーしました");
+            } catch (err) {
+                fallbackCopy(quizText);
+            }
         });
+
+        function fallbackCopy(text) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showToast("クリップボードにコピーしました");
+        }
 
         // ---- 保存＆履歴管理 ----
         saveCurrentBtn.addEventListener('click', () => {
@@ -1160,9 +1008,9 @@
                             <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-700">${item.level}</span>
                             <span class="font-medium text-slate-800 truncate block">${escapeHtml(item.keyword)}</span>
                         </div>
-                        <span class="text-[10px] text-slate-400 block">${item.examples?.length || 0}例文・テスト</span>
+                        <span class="text-[10px] text-slate-400 block">${item.count || 3}件 ｜ ${escapeHtml(item.context || '')}</span>
                     </div>
-                    <button class="delete-history-btn text-slate-300 hover:text-rose-500 p-1 rounded transition opacity-0 group-hover:opacity-100" data-del-idx="${idx}">
+                    <button class="delete-history-btn text-slate-300 hover:text-rose-500 p-1 rounded transition opacity-0 group-hover:opacity-100" data-del-idx="${idx}" title="削除">
                         <i data-lucide="x" class="w-3.5 h-3.5"></i>
                     </button>
                 `;
@@ -1172,9 +1020,9 @@
                     currentData = savedItems[idx];
                     keywordInput.value = currentData.keyword;
                     jlptLevelSelect.value = currentData.level;
+                    if (currentData.context) contextCategorySelect.value = currentData.context;
+                    if (currentData.count) sentenceCountSelect.value = currentData.count;
                     renderOutput(currentData);
-                    saveCurrentBtn.disabled = false;
-                    printBtn.disabled = false;
                     placeholderState.classList.add('hidden');
                 });
 
@@ -1207,18 +1055,17 @@
 
         function clearOutputView() {
             currentData = null;
-            sentencesList.innerHTML = '';
-            quizList.innerHTML = '';
+            outputContent.innerHTML = '';
+            outputContentContainer.classList.add('hidden');
             activeLevelBadge.classList.add('hidden');
             activeKeywordBadge.classList.add('hidden');
             if (activeSourceBadge) activeSourceBadge.classList.add('hidden');
-            sentencesContent.classList.add('hidden');
-            quizContent.classList.add('hidden');
             loadingState.classList.add('hidden');
             if (errorState) errorState.classList.add('hidden');
             placeholderState.classList.remove('hidden');
+            copyAllBtn.disabled = true;
+            copyQuizBtn.disabled = true;
             saveCurrentBtn.disabled = true;
-            printBtn.disabled = true;
         }
 
         // ---- 簡易ユーティリティ ----
