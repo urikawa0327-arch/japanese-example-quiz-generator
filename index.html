@@ -203,6 +203,12 @@
                                 <span>例文とテストを生成する</span>
                             </button>
 
+                            <!-- 生成中断ボタン（フォーム側） -->
+                            <button type="button" id="formAbortBtn" class="hidden w-full bg-rose-600 hover:bg-rose-700 text-white font-medium py-2.5 px-4 rounded-lg shadow-sm flex items-center justify-center gap-2 transition active:scale-[0.99]">
+                                <i data-lucide="square" class="w-4 h-4 fill-white"></i>
+                                <span>生成を中断する</span>
+                            </button>
+
                             <!-- 入力・生成を一括クリアするリセットボタン -->
                             <button type="button" id="resetAllBtn" class="w-full bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 hover:border-rose-200 text-xs font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition">
                                 <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
@@ -284,11 +290,17 @@
                         </div>
 
                         <!-- ローディング表示 -->
-                        <div id="loadingState" class="hidden my-auto py-12 text-center space-y-3">
+                        <div id="loadingState" class="hidden my-auto py-12 text-center space-y-4">
                             <div class="inline-block animate-spin rounded-full h-9 w-9 border-4 border-indigo-600 border-t-transparent"></div>
                             <div>
                                 <p class="text-sm font-bold text-slate-800" id="loadingTitle">Gemini AI で例文とテストを生成中...</p>
                                 <p class="text-xs text-slate-500 mt-1" id="loadingSubtitle">対象項目・レベル・文脈に応じた自然な日本語を構成しています</p>
+                            </div>
+                            <div class="pt-1">
+                                <button type="button" id="loadingAbortBtn" class="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg transition shadow-xs active:scale-95">
+                                    <i data-lucide="square" class="w-3.5 h-3.5 fill-rose-600"></i>
+                                    <span>生成を中断してやり直す</span>
+                                </button>
                             </div>
                         </div>
 
@@ -544,6 +556,8 @@
         const contextCategorySelect = document.getElementById('contextCategory');
         const sentenceCountSelect = document.getElementById('sentenceCount');
         const generateBtn = document.getElementById('generateBtn');
+        const formAbortBtn = document.getElementById('formAbortBtn');
+        const loadingAbortBtn = document.getElementById('loadingAbortBtn');
         const resetAllBtn = document.getElementById('resetAllBtn');
         const clearResultsBtn = document.getElementById('clearResultsBtn');
         const historyList = document.getElementById('historyList');
@@ -572,6 +586,29 @@
         const outputContent = document.getElementById('outputContent');
         const usedModelText = document.getElementById('usedModelText');
         const contentWrapper = document.getElementById('contentWrapper');
+
+        // 生成中断用 AbortController
+        let currentAbortController = null;
+
+        // ---- 生成中断処理 ----
+        function abortGeneration() {
+            if (currentAbortController) {
+                currentAbortController.abort();
+                currentAbortController = null;
+            }
+            loadingState.classList.add('hidden');
+            generateBtn.classList.remove('hidden');
+            generateBtn.disabled = false;
+            if (formAbortBtn) formAbortBtn.classList.add('hidden');
+
+            if (currentData) {
+                outputContentContainer.classList.remove('hidden');
+            } else {
+                placeholderState.classList.remove('hidden');
+            }
+            showToast("生成を中断しました。条件を変更してやり直せます。");
+            lucide.createIcons();
+        }
 
         // ---- 種別ラジオボタン用ヘルパー ----
         function getItemType() {
@@ -630,68 +667,63 @@
             lucide.createIcons();
         }
 
-        // ---- 利用可能なモデル一覧を動的取得（APIのListModelsを直接呼び出し / Pro系は除外） ----
-        async function getAvailableModels(apiKey) {
-            const versions = ['v1beta', 'v1'];
-            let allModels = [];
+        // ---- 利用可能なモデル一覧を動的取得（v1betaに一本化 / Pro系除外 / キャッシュ対応で404防止） ----
+        let cachedAvailableModels = null;
 
-            for (const ver of versions) {
-                try {
-                    const res = await fetch(`https://generativelanguage.googleapis.com/${ver}/models?key=${apiKey}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.models && Array.isArray(data.models)) {
-                            // generateContent をサポートし、かつ Pro系モデルを除外
-                            const valid = data.models
-                                .filter(m => (!m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent'))
-                                             && !m.name.toLowerCase().includes('pro'))
-                                .map(m => ({
-                                    name: m.name.replace(/^models\//, ''),
-                                    version: ver,
-                                    displayName: m.displayName || m.name
-                                }));
-                            allModels.push(...valid);
+        async function getAvailableModels(apiKey, forceRefresh = false) {
+            if (!forceRefresh && cachedAvailableModels && cachedAvailableModels.length > 0) {
+                return cachedAvailableModels;
+            }
+
+            // 実績のある主要Flashモデル（v1beta）を最優先フォールバックとして定義
+            const defaultModels = [
+                { name: 'gemini-1.5-flash', version: 'v1beta', displayName: 'Gemini 1.5 Flash' },
+                { name: 'gemini-2.0-flash', version: 'v1beta', displayName: 'Gemini 2.0 Flash' },
+                { name: 'gemini-1.5-flash-8b', version: 'v1beta', displayName: 'Gemini 1.5 Flash 8B' }
+            ];
+
+            try {
+                // v1は404になる環境があるため、確実なv1betaエンドポイントを使用
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.models && Array.isArray(data.models)) {
+                        // generateContent をサポートし、かつ Pro系を除外
+                        const valid = data.models
+                            .filter(m => (!m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent'))
+                                         && !m.name.toLowerCase().includes('pro'))
+                            .map(m => ({
+                                name: m.name.replace(/^models\//, ''),
+                                version: 'v1beta',
+                                displayName: m.displayName || m.name
+                            }));
+
+                        if (valid.length > 0) {
+                            // 1.5-flash / 2.0-flash を最優先にソート
+                            valid.sort((a, b) => {
+                                const score = (m) => {
+                                    const n = m.name.toLowerCase();
+                                    if (n === 'gemini-1.5-flash') return 100;
+                                    if (n.includes('2.0-flash')) return 95;
+                                    if (n.includes('1.5-flash-8b')) return 90;
+                                    if (n.includes('1.5-flash')) return 85;
+                                    if (n.includes('flash')) return 80;
+                                    return 10;
+                                };
+                                return score(b) - score(a);
+                            });
+
+                            cachedAvailableModels = valid;
+                            return cachedAvailableModels;
                         }
                     }
-                } catch (e) {
-                    console.warn(`モデル一覧取得スキップ (${ver}):`, e);
                 }
+            } catch (e) {
+                console.warn("モデル一覧取得スキップ (標準リストを使用します):", e);
             }
 
-            // 重複排除
-            const seen = new Set();
-            const uniqueModels = [];
-            for (const m of allModels) {
-                const key = `${m.version}:${m.name}`;
-                if (!seen.has(key)) {
-                    seen.add(key);
-                    uniqueModels.push(m);
-                }
-            }
-
-            if (uniqueModels.length > 0) {
-                // 最適なモデル順にソート（2.0-flash / 1.5-flash などの高速・安定モデルを最優先）
-                uniqueModels.sort((a, b) => {
-                    const score = (m) => {
-                        const n = m.name.toLowerCase();
-                        if (n.includes('2.0-flash')) return 100;
-                        if (n.includes('1.5-flash-8b')) return 92;
-                        if (n.includes('1.5-flash')) return 90;
-                        if (n.includes('flash')) return 80;
-                        return 10;
-                    };
-                    return score(b) - score(a);
-                });
-                return uniqueModels;
-            }
-
-            // 万が一ListModelsが取得できなかった場合のフォールバックリスト（Pro系は除外）
-            return [
-                { name: 'gemini-1.5-flash', version: 'v1beta' },
-                { name: 'gemini-1.5-flash', version: 'v1' },
-                { name: 'gemini-2.0-flash', version: 'v1beta' },
-                { name: 'gemini-1.5-flash-8b', version: 'v1beta' }
-            ];
+            cachedAvailableModels = defaultModels;
+            return cachedAvailableModels;
         }
 
         async function testApiKeyConnection() {
@@ -994,10 +1026,15 @@ ${typeSpecificRule}
 
             loadingTitle.textContent = `Gemini AI で「${keyword}」(${itemType}) の例文とテストを生成中...`;
             loadingSubtitle.textContent = `レベル: ${level} ｜ 利用場面: ${context} に適した自然な日本語を構成しています`;
-            generateBtn.disabled = true;
+            
+            // 生成ボタンを隠し、中断ボタンを表示
+            generateBtn.classList.add('hidden');
+            if (formAbortBtn) formAbortBtn.classList.remove('hidden');
+
+            currentAbortController = new AbortController();
 
             try {
-                const result = await fetchFromGemini(apiKey, keyword, itemType, level, context, count);
+                const result = await fetchFromGemini(apiKey, keyword, itemType, level, context, count, currentAbortController.signal);
 
                 // 生成結果の末尾にも使用モデルを明記
                 const fullText = result.text.includes('*使用モデル:') 
@@ -1025,6 +1062,18 @@ ${typeSpecificRule}
                 }
 
             } catch (err) {
+                // ユーザーによる中断の場合
+                if (err.name === 'AbortError' || err.message.includes('中断')) {
+                    loadingState.classList.add('hidden');
+                    if (currentData) {
+                        outputContentContainer.classList.remove('hidden');
+                    } else {
+                        placeholderState.classList.remove('hidden');
+                    }
+                    showToast("生成を中断しました。条件を変更してやり直せます。");
+                    return;
+                }
+
                 console.error("Gemini API生成エラー:", err);
                 loadingState.classList.add('hidden');
                 errorState.classList.remove('hidden');
@@ -1032,39 +1081,68 @@ ${typeSpecificRule}
                 showToast("Gemini AI による生成に失敗しました");
             } finally {
                 loadingState.classList.add('hidden');
+                generateBtn.classList.remove('hidden');
                 generateBtn.disabled = false;
+                if (formAbortBtn) formAbortBtn.classList.add('hidden');
+                currentAbortController = null;
                 lucide.createIcons();
             }
         }
 
         generatorForm.addEventListener('submit', handleGenerate);
         generateBtn.addEventListener('click', handleGenerate);
+        if (formAbortBtn) formAbortBtn.addEventListener('click', abortGeneration);
+        if (loadingAbortBtn) loadingAbortBtn.addEventListener('click', abortGeneration);
 
-        // ---- Gemini API 呼び出し（利用可能モデルの動的自動検出＆生成） ----
-        async function fetchFromGemini(rawApiKey, keyword, itemType, level, context, count) {
+        // ---- Gemini API 呼び出し（利用可能モデルの動的自動検出＆生成 / 中断・タイムアウト対応） ----
+        async function fetchFromGemini(rawApiKey, keyword, itemType, level, context, count, externalSignal) {
             const apiKey = (rawApiKey || '').replace(/["'\r\n\s]/g, '');
             if (!apiKey) {
                 throw new Error("Gemini APIキーが設定されていません。右上の「Gemini API 設定」からキーを入力してください。");
             }
 
+            if (externalSignal && externalSignal.aborted) {
+                throw new Error("中断されました");
+            }
+
             const prompt = buildPrompt(keyword, itemType, level, context, count);
 
-            // 1. そのAPIキーで利用可能なモデル一覧をGoogleから動的取得（Pro系は除外済み）
+            // 利用可能な高速モデル一覧を取得（v1betaのみ・キャッシュ対応）
             const availableModels = await getAvailableModels(apiKey);
 
             let attemptErrors = [];
 
-            // 2. 取得した利用可能なモデルで順次 generateContent を実行
+            // 取得した利用可能モデルで順次 generateContent を実行
             for (const m of availableModels) {
+                if (externalSignal && externalSignal.aborted) {
+                    throw new Error("中断されました");
+                }
+
+                // 各モデルへのリクエストは最大20秒でタイムアウトさせ、無駄な待機を防ぐ
+                const modelTimeoutCtrl = new AbortController();
+                const timeoutId = setTimeout(() => modelTimeoutCtrl.abort(), 20000);
+
+                // 外部シグナル（ユーザー中断）との連動リスナー
+                const onExternalAbort = () => modelTimeoutCtrl.abort();
+                if (externalSignal) {
+                    externalSignal.addEventListener('abort', onExternalAbort);
+                }
+
                 try {
-                    const url = `https://generativelanguage.googleapis.com/${m.version}/models/${m.name}:generateContent?key=${apiKey}`;
+                    const url = `https://generativelanguage.googleapis.com/v1beta/models/${m.name}:generateContent?key=${apiKey}`;
                     const response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             contents: [{ parts: [{ text: prompt }] }]
-                        })
+                        }),
+                        signal: modelTimeoutCtrl.signal
                     });
+
+                    clearTimeout(timeoutId);
+                    if (externalSignal) {
+                        externalSignal.removeEventListener('abort', onExternalAbort);
+                    }
 
                     if (!response.ok) {
                         const errData = await response.json().catch(() => ({}));
@@ -1080,7 +1158,8 @@ ${typeSpecificRule}
                             throw new Error("【利用制限】APIのリクエスト上限に達しました。数十秒待ってから再試行してください。");
                         }
 
-                        attemptErrors.push(`[${m.name} (${m.version})] ${errMsg}`);
+                        // 404やその他のエラーは次のモデルへ速やかに移行
+                        attemptErrors.push(`[${m.name}] ${errMsg}`);
                         continue;
                     }
 
@@ -1093,14 +1172,25 @@ ${typeSpecificRule}
                         usedModel: m.name
                     };
                 } catch (err) {
+                    clearTimeout(timeoutId);
+                    if (externalSignal) {
+                        externalSignal.removeEventListener('abort', onExternalAbort);
+                    }
+
+                    // ユーザーによる中断の場合は即座に上位へスロー
+                    if (externalSignal && externalSignal.aborted) {
+                        throw new Error("中断されました");
+                    }
+
                     if (err.message.includes('【APIキー無効】') || err.message.includes('【権限エラー】') || err.message.includes('【利用制限】')) {
                         throw err;
                     }
-                    attemptErrors.push(`[${m.name}] ${err.message}`);
+
+                    attemptErrors.push(`[${m.name}] ${err.name === 'AbortError' ? '20秒タイムアウト' : err.message}`);
                 }
             }
 
-            throw new Error(`利用可能なGeminiモデルでの生成に失敗しました:\n${attemptErrors.slice(0, 3).join('\n')}\n※APIキーの権限、またはGoogle AI Studioで新しいAPIキーの作成をお試しください。`);
+            throw new Error(`利用可能なGeminiモデルでの生成に失敗しました:\n${attemptErrors.slice(0, 3).join('\n')}\n※APIキーの権限、または別のGeminiモデルをお試しください。`);
         }
 
         // ---- 描画処理 ----
