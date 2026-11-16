@@ -123,6 +123,23 @@
                     </h2>
 
                     <form id="generatorForm" class="space-y-4">
+                        <!-- 項目の種別（文法・文型 / 語彙・言葉） -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">
+                                項目の種別 <span class="text-rose-500">*</span>
+                            </label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition has-[:checked]:border-indigo-600 has-[:checked]:bg-indigo-50/50 has-[:checked]:text-indigo-900">
+                                    <input type="radio" name="itemType" value="文法・文型" checked class="text-indigo-600 focus:ring-indigo-500">
+                                    <span class="text-xs font-medium">文法・文型</span>
+                                </label>
+                                <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition has-[:checked]:border-indigo-600 has-[:checked]:bg-indigo-50/50 has-[:checked]:text-indigo-900">
+                                    <input type="radio" name="itemType" value="語彙・言葉" class="text-indigo-600 focus:ring-indigo-500">
+                                    <span class="text-xs font-medium">語彙・言葉</span>
+                                </label>
+                            </div>
+                        </div>
+
                         <!-- 検索キーワード -->
                         <div>
                             <div class="flex items-center justify-between mb-1">
@@ -135,9 +152,9 @@
                             <!-- プリセットチップ -->
                             <div class="flex items-center gap-1.5 pt-2 flex-wrap text-[11px]">
                                 <span class="text-slate-400">例を試す:</span>
-                                <button type="button" class="preset-chip bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-200 transition" data-word="〜ないほうがいいです" data-level="N4" data-context="日常生活・学校生活">〜ないほうがいい (N4)</button>
-                                <button type="button" class="preset-chip bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-200 transition" data-word="身近" data-level="N3" data-context="日常生活・学校生活">身近 (N3)</button>
-                                <button type="button" class="preset-chip bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-200 transition" data-word="検討する" data-level="N2" data-context="ビジネス・社会">検討する (N2)</button>
+                                <button type="button" class="preset-chip bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-200 transition" data-word="〜ないほうがいいです" data-type="文法・文型" data-level="N4" data-context="日常生活・学校生活">〜ないほうがいい (文法/N4)</button>
+                                <button type="button" class="preset-chip bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-200 transition" data-word="身近" data-type="語彙・言葉" data-level="N3" data-context="日常生活・学校生活">身近 (語彙/N3)</button>
+                                <button type="button" class="preset-chip bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 text-slate-600 px-2 py-0.5 rounded border border-slate-200 transition" data-word="検討する" data-type="語彙・言葉" data-level="N2" data-context="ビジネス・社会">検討する (語彙/N2)</button>
                             </div>
                         </div>
 
@@ -218,6 +235,7 @@
                     <div class="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/70 rounded-t-xl">
                         <div class="flex items-center gap-2">
                             <h2 class="text-base font-bold text-slate-800">生成結果</h2>
+                            <span id="activeTypeBadge" class="hidden text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold">文法・文型</span>
                             <span id="activeLevelBadge" class="hidden text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-bold">N4</span>
                             <span id="activeKeywordBadge" class="hidden text-xs bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-medium truncate max-w-[200px]"></span>
                             <span id="activeSourceBadge" class="hidden text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-medium"></span>
@@ -297,6 +315,14 @@
                         <!-- 生成結果テキスト表示エリア -->
                         <div id="outputContentContainer" class="hidden">
                             <div id="outputContent" class="generated-content text-slate-800 leading-relaxed text-sm"></div>
+                            
+                            <!-- 生成モデル表示フッター -->
+                            <div id="outputModelFooter" class="mt-6 pt-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+                                <div class="flex items-center gap-1.5">
+                                    <i data-lucide="cpu" class="w-4 h-4 text-indigo-500"></i>
+                                    <span>生成モデル: <strong id="usedModelText" class="font-semibold text-slate-700"></strong></span>
+                                </div>
+                            </div>
                         </div>
 
                     </div>
@@ -524,6 +550,7 @@
         const savedCount = document.getElementById('savedCount');
 
         const activeLevelBadge = document.getElementById('activeLevelBadge');
+        const activeTypeBadge = document.getElementById('activeTypeBadge');
         const activeKeywordBadge = document.getElementById('activeKeywordBadge');
         const activeSourceBadge = document.getElementById('activeSourceBadge');
         const toggleFuriganaBtn = document.getElementById('toggleFuriganaBtn');
@@ -543,7 +570,19 @@
 
         const outputContentContainer = document.getElementById('outputContentContainer');
         const outputContent = document.getElementById('outputContent');
+        const usedModelText = document.getElementById('usedModelText');
         const contentWrapper = document.getElementById('contentWrapper');
+
+        // ---- 種別ラジオボタン用ヘルパー ----
+        function getItemType() {
+            const checked = document.querySelector('input[name="itemType"]:checked');
+            return checked ? checked.value : '文法・文型';
+        }
+
+        function setItemType(val) {
+            const radio = document.querySelector(`input[name="itemType"][value="${val}"]`);
+            if (radio) radio.checked = true;
+        }
 
         // ---- 初期化処理 ----
         function init() {
@@ -591,7 +630,7 @@
             lucide.createIcons();
         }
 
-        // ---- 利用可能なモデル一覧を動的取得（APIのListModelsを直接呼び出し） ----
+        // ---- 利用可能なモデル一覧を動的取得（APIのListModelsを直接呼び出し / Pro系は除外） ----
         async function getAvailableModels(apiKey) {
             const versions = ['v1beta', 'v1'];
             let allModels = [];
@@ -602,9 +641,10 @@
                     if (res.ok) {
                         const data = await res.json();
                         if (data.models && Array.isArray(data.models)) {
-                            // generateContent をサポートしているモデルのみ抽出
+                            // generateContent をサポートし、かつ Pro系モデルを除外
                             const valid = data.models
-                                .filter(m => !m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent'))
+                                .filter(m => (!m.supportedGenerationMethods || m.supportedGenerationMethods.includes('generateContent'))
+                                             && !m.name.toLowerCase().includes('pro'))
                                 .map(m => ({
                                     name: m.name.replace(/^models\//, ''),
                                     version: ver,
@@ -638,8 +678,6 @@
                         if (n.includes('1.5-flash-8b')) return 92;
                         if (n.includes('1.5-flash')) return 90;
                         if (n.includes('flash')) return 80;
-                        if (n.includes('1.5-pro')) return 70;
-                        if (n.includes('pro')) return 60;
                         return 10;
                     };
                     return score(b) - score(a);
@@ -647,14 +685,12 @@
                 return uniqueModels;
             }
 
-            // 万が一ListModelsが取得できなかった場合のフォールバックリスト
+            // 万が一ListModelsが取得できなかった場合のフォールバックリスト（Pro系は除外）
             return [
                 { name: 'gemini-1.5-flash', version: 'v1beta' },
                 { name: 'gemini-1.5-flash', version: 'v1' },
                 { name: 'gemini-2.0-flash', version: 'v1beta' },
-                { name: 'gemini-1.5-flash-8b', version: 'v1beta' },
-                { name: 'gemini-1.5-pro', version: 'v1beta' },
-                { name: 'gemini-pro', version: 'v1' }
+                { name: 'gemini-1.5-flash-8b', version: 'v1beta' }
             ];
         }
 
@@ -713,9 +749,11 @@
             document.querySelectorAll('.preset-chip').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const word = btn.dataset.word;
+                    const type = btn.dataset.type;
                     const level = btn.dataset.level;
                     const context = btn.dataset.context;
                     if (word) keywordInput.value = word;
+                    if (type) setItemType(type);
                     if (level) jlptLevelSelect.value = level;
                     if (context) contextCategorySelect.value = context;
                     handleGenerate();
@@ -726,31 +764,51 @@
         // ---- ふりがな表記変換ヘルパー ----
         // 1. 半角/全角括弧の「漢字(かんじ)」または「漢字（かんじ）」を <ruby>漢字<rt>かんじ</rt></ruby> に変換
         // 2. 万が一AIが「ひらがな（漢字）」の逆順（例：にほん（日本）、らいふ（生活）、おおい（多い））を出力した場合の自己修復機能も備える
+        // 3. 見出し行（#### や ■）および「理解度確認テスト（学生用）」などの見出し語句にはルビを振らず、誤って付いたルビや「(テスト)」を完全に除去
         function formatRuby(text) {
             if (!text) return '';
-            let fixed = text;
-            
-            // AIが「ひらがな（漢字）」や「送り仮名付きのひらがな（漢字）」を出力した場合の逆順修復
-            // 例: にほん（日本） -> 日本(にほん)
-            // 例: おおい（多い） -> 多い(おおい)
-            fixed = fixed.replace(/([ぁ-んァ-ヶー]+)[（\(]([一-龯々ヶ]+)([ぁ-んァ-ヶー]*)[）\)]/g, (match, hira, kanji, okuri) => {
-                let cleanHira = hira;
-                if (okuri && cleanHira.endsWith(okuri)) {
-                    cleanHira = cleanHira.slice(0, -okuri.length);
+            const lines = text.split('\n');
+            const processed = lines.map(line => {
+                const trimmed = line.trim();
+                // 見出し行（#### 等や ■ で始まるセクション見出し）はルビ変換をスキップし、不要なルビや誤付与された「(テスト)」を除去
+                if (/^#{1,6}\s+/.test(trimmed) || trimmed.startsWith('■')) {
+                    return line
+                        .replace(/<ruby>(.*?)<rt>.*?<\/rt><\/ruby>/g, '$1')
+                        .replace(/理解度確認[（\(]テスト[）\)]/g, '理解度確認テスト')
+                        .replace(/([一-龯々ヶ]+)[（\(][ぁ-んァ-ヶー]+[）\)]/g, '$1');
                 }
-                return `${kanji}(${cleanHira})${okuri}`;
+
+                let fixed = line;
+
+                // 本文中に万一「理解度確認(テスト)」のような誤ルビ表現が混ざった場合の修復
+                fixed = fixed.replace(/理解度確認[（\(]テスト[）\)]/g, '理解度確認テスト');
+
+                // AIが「ひらがな（漢字）」や「送り仮名付きのひらがな（漢字）」を出力した場合の逆順修復
+                // 例: にほん（日本） -> 日本(にほん)
+                // 例: おおい（多い） -> 多い(おおい)
+                fixed = fixed.replace(/([ぁ-んァ-ヶー]+)[（\(]([一-龯々ヶ]+)([ぁ-んァ-ヶー]*)[）\)]/g, (match, hira, kanji, okuri) => {
+                    let cleanHira = hira;
+                    if (okuri && cleanHira.endsWith(okuri)) {
+                        cleanHira = cleanHira.slice(0, -okuri.length);
+                    }
+                    return `${kanji}(${cleanHira})${okuri}`;
+                });
+
+                // 漢字(ひらがな/カタカナ) または 漢字（ひらがな/カタカナ） を <ruby>漢字<rt>ひらがな</rt></ruby> に変換
+                fixed = fixed.replace(/([一-龯々ヶ]+)[（\(]([ぁ-んァ-ヶー]+)[）\)]/g, '<ruby>$1<rt>$2</rt></ruby>');
+
+                return fixed;
             });
 
-            // 漢字(ひらがな/カタカナ) または 漢字（ひらがな/カタカナ） を <ruby>漢字<rt>ひらがな</rt></ruby> に変換
-            fixed = fixed.replace(/([一-龯々ヶ]+)[（\(]([ぁ-んァ-ヶー]+)[）\)]/g, '<ruby>$1<rt>$2</rt></ruby>');
-
-            return fixed;
+            return processed.join('\n');
         }
 
         // ふりがな除去ヘルパー（プレーンテキスト化）
         function stripRuby(text) {
             if (!text) return '';
             let s = text;
+            // 「理解度確認(テスト)」を「理解度確認テスト」に統一
+            s = s.replace(/理解度確認[（\(]テスト[）\)]/g, '理解度確認テスト');
             // 逆順の「ひらがな（漢字）」を漢字に
             s = s.replace(/([ぁ-んァ-ヶー]+)[（\(]([一-龯々ヶ]+)([ぁ-んァ-ヶー]*)[）\)]/g, '$2$3');
             // 通常の「漢字(ひらがな)」または「漢字（ひらがな）」を漢字だけに
@@ -773,12 +831,24 @@
         });
 
         // ---- プロンプト構築（ユーザー指定プロンプトに完全準拠） ----
-        function buildPrompt(keyword, level, context, count) {
+        function buildPrompt(keyword, itemType, level, context, count) {
+            const isGrammar = itemType === '文法・文型';
+            const typeSpecificRule = isGrammar
+                ? `   - 【項目種別：文法・文型】
+     * 「接続形式（動詞の活用形、名詞＋の、など）」や前後の文法的呼応を正確に解説してください。
+     * 目上の人への使用可否や話し言葉／書き言葉の使い分け、ニュアンスの制限を「指導のポイント」に必ず含めてください。
+     * 「確認テスト」では、前後の接続や活用形の誤用（例：ナイ形とタ形の混同など）を正しく見分ける穴埋め問題を作成してください。`
+                : `   - 【項目種別：語彙・言葉】
+     * 単語の品詞（名詞、な形容詞、い形容詞、自動詞/他動詞など）に即した自然な用法とコロケーション（よく一緒に使われる助詞や語句）を提示してください。
+     * 単なる機械的置換を避け、その語彙本来の意味や文脈に合った自然な使い方を「指導のポイント」で解説してください。
+     * 「確認テスト」では、文脈に合った正しい語彙・品詞の使い分けを問う穴埋め問題を作成してください。`;
+
             return `あなたは日本語教育（日本語教師）のプロフェッショナルです。
-留学生などの日本語学習者に向けて、指定された「語彙・文法項目」を使った例文と、学習内容を確認するための「穴埋めテスト問題」を作成してください。
+留学生などの日本語学習者に向けて、指定された「${itemType}」を使った例文と、学習内容を確認するための「穴埋めテスト問題」を作成してください。
 
 ### 【入力条件】
 - 検索・対象項目: ${keyword}
+- 項目種別: ${itemType}
 - 学習者レベル: ${level}
 - 利用場面・文脈: ${context}
 - 例文の作成数: ${count}件
@@ -786,15 +856,18 @@
 ### 【作成・出力のルール】
 1. **語彙・文法レベルの厳守**:
    - 指定されたJLPTレベル（${level}）の学習者がすでに習得している、または理解できる語彙や漢字・文法のみを使用してください。指定レベルを超えた難しい語彙や複雑な漢字は使わないでください。
-2. **ルビ（ふりがな）の表記とWeb表示連動**:
+2. **項目種別（${itemType}）に応じた作問・指導方針**:
+${typeSpecificRule}
+3. **ルビ（ふりがな）の表記とWeb表示連動**:
    - **本文は必ず自然で正しい日本語の漢字かな交じり文にしてください**（漢字をすべてひらがなに変えてはいけません。不自然なカタカナ語への置き換えも禁止です）。
-   - Web画面上で「ふりがなの表示・非表示」を正しく切り替えるため、すべての漢字の直後に **漢字(かんじ)** の形式でルビ（読み方）をつけてください。半角括弧または全角括弧で記載してください。
+   - Web画面上で「ふりがなの表示・非表示」を正しく切り替えるため、本文中のすべての漢字の直後に **漢字(かんじ)** の形式でルビ（読み方）をつけてください。半角括弧または全角括弧で記載してください。
    - 【NG例】: にほん（日本）の らいふ（生活）は たいへんという 人（ひと）が おおいです。 （※ひらがなに（漢字）をつけたり、漢字をひらがな化するのは厳禁です）
    - 【OK例】: 日本(にほん)の生活(せいかつ)は大変(たいへん)という人(ひと)が多(おお)いです。
    - 送り仮名がある語句は「多(おお)い」「食(た)べる」または「多い(おおい)」のように漢字に対応する読み方を記載してください。
-3. **自然で実用的な文脈**:
+   - **【最重要・見出しのルビ禁止】**: 各セクションの見出し（例：「#### ■ 例文と指導のポイント」「#### ■ 理解度確認テスト（学生用）」「#### ■ テストの解答と解説（教師用）」）には、絶対にルビを付けないでください。「理解度確認(テスト)」のようにカタカナをルビとして括弧付けすることも厳禁です。
+4. **自然で実用的な文脈**:
    - 単なる語句の機械的挿入（例：「〜を正しく使う」等）ではなく、その語彙・文法の本来の語義・コロケーション・文脈に沿った、留学生が実際の生活や教室でそのまま使える自然な日本語にしてください。
-4. **確認テストの作成**:
+5. **確認テストの作成**:
    - 生成した例文をベースに、指定項目（${keyword}）の定着度を測る「4択の穴埋め問題」を例文と同数作成してください。誤答の選択肢（ダミー）も学習者がよく間違えやすい文法・形態（例：ナイ形とタ形の誤用など）を入れてください。
 
 ---
@@ -838,6 +911,7 @@
                 return;
             }
 
+            const itemType = getItemType();
             const level = jlptLevelSelect.value;
             const context = contextCategorySelect.value;
             const count = parseInt(sentenceCountSelect.value, 10) || 3;
@@ -851,11 +925,13 @@
                 if (demoMatch) {
                     currentData = {
                         keyword,
+                        itemType,
                         level,
                         context,
                         count,
                         source: "事前収録デモ",
-                        rawText: demoMatch,
+                        usedModel: "事前収録デモ（オフライン）",
+                        rawText: demoMatch + "\n\n---\n*使用モデル: 事前収録デモ（オフライン）*",
                         createdAt: new Date().toISOString()
                     };
                     renderOutput(currentData);
@@ -875,25 +951,32 @@
             errorState.classList.add('hidden');
             loadingState.classList.remove('hidden');
 
-            loadingTitle.textContent = `Gemini AI で「${keyword}」の例文とテストを生成中...`;
+            loadingTitle.textContent = `Gemini AI で「${keyword}」(${itemType}) の例文とテストを生成中...`;
             loadingSubtitle.textContent = `レベル: ${level} ｜ 利用場面: ${context} に適した自然な日本語を構成しています`;
             generateBtn.disabled = true;
 
             try {
-                const result = await fetchFromGemini(apiKey, keyword, level, context, count);
+                const result = await fetchFromGemini(apiKey, keyword, itemType, level, context, count);
+
+                // 生成結果の末尾にも使用モデルを明記
+                const fullText = result.text.includes('*使用モデル:') 
+                    ? result.text 
+                    : `${result.text}\n\n---\n*使用モデル: ${result.usedModel}*`;
 
                 currentData = {
                     keyword,
+                    itemType,
                     level,
                     context,
                     count,
                     source: `Gemini AI (${result.usedModel})`,
-                    rawText: result.text,
+                    usedModel: result.usedModel,
+                    rawText: fullText,
                     createdAt: new Date().toISOString()
                 };
 
                 renderOutput(currentData);
-                showToast(`Gemini AI により「${keyword}」の例文とテストを生成しました`);
+                showToast(`Gemini AI (${result.usedModel}) により生成しました`);
 
                 const outputEl = document.getElementById('outputContainer');
                 if (outputEl && window.innerWidth < 1024) {
@@ -917,15 +1000,15 @@
         generateBtn.addEventListener('click', handleGenerate);
 
         // ---- Gemini API 呼び出し（利用可能モデルの動的自動検出＆生成） ----
-        async function fetchFromGemini(rawApiKey, keyword, level, context, count) {
+        async function fetchFromGemini(rawApiKey, keyword, itemType, level, context, count) {
             const apiKey = (rawApiKey || '').replace(/["'\r\n\s]/g, '');
             if (!apiKey) {
                 throw new Error("Gemini APIキーが設定されていません。右上の「Gemini API 設定」からキーを入力してください。");
             }
 
-            const prompt = buildPrompt(keyword, level, context, count);
+            const prompt = buildPrompt(keyword, itemType, level, context, count);
 
-            // 1. そのAPIキーで利用可能なモデル一覧をGoogleから動的取得
+            // 1. そのAPIキーで利用可能なモデル一覧をGoogleから動的取得（Pro系は除外済み）
             const availableModels = await getAvailableModels(apiKey);
 
             let attemptErrors = [];
@@ -982,18 +1065,30 @@
         // ---- 描画処理 ----
         function renderOutput(data) {
             // バッジ更新
+            if (activeTypeBadge) {
+                activeTypeBadge.textContent = data.itemType || '文法・文型';
+                activeTypeBadge.className = data.itemType === '語彙・言葉'
+                    ? "text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-bold"
+                    : "text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-bold";
+                activeTypeBadge.classList.remove('hidden');
+            }
             activeLevelBadge.textContent = data.level;
             activeLevelBadge.classList.remove('hidden');
             activeKeywordBadge.textContent = data.keyword;
             activeKeywordBadge.classList.remove('hidden');
 
             if (activeSourceBadge) {
-                const isGemini = data.source === "Gemini AI";
+                const isGemini = (data.source || '').includes('Gemini');
                 activeSourceBadge.textContent = data.source || "Gemini AI";
                 activeSourceBadge.className = isGemini 
                     ? "text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium"
                     : "text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-medium";
                 activeSourceBadge.classList.remove('hidden');
+            }
+
+            // 生成モデル表示フッター更新（生成結果の最後に表示）
+            if (usedModelText) {
+                usedModelText.textContent = data.usedModel || (data.source ? data.source.replace(/^Gemini AI \((.*)\)$/, '$1') : 'Gemini AI');
             }
 
             // Markdownパース & ルビタグ変換
@@ -1034,13 +1129,17 @@
 
         copyQuizBtn.addEventListener('click', async () => {
             if (!currentData || !currentData.rawText) return;
-            // 「■ 理解度確認テスト（学生用）」から「■ テストの解答と解説」の手前までを抽出
+            // 「■ 理解度確認テスト（学生用）」または「■ 理解度確認（学生用）」から「■ テストの解答と解説」の手前までを抽出
             const sourceText = isFuriganaVisible ? currentData.rawText : stripRuby(currentData.rawText);
-            const startIdx = sourceText.indexOf('#### ■ 理解度確認テスト（学生用）');
-            const endIdx = sourceText.indexOf('#### ■ テストの解答と解説（教師用）');
+            let startIdx = sourceText.indexOf('#### ■ 理解度確認テスト（学生用）');
+            if (startIdx === -1) startIdx = sourceText.indexOf('#### ■ 理解度確認（学生用）');
+            if (startIdx === -1) startIdx = sourceText.indexOf('■ 理解度確認');
+
+            let endIdx = sourceText.indexOf('#### ■ テストの解答と解説（教師用）');
+            if (endIdx === -1) endIdx = sourceText.indexOf('■ テストの解答と解説');
             
             let quizText = '';
-            if (startIdx !== -1 && endIdx !== -1) {
+            if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
                 quizText = sourceText.substring(startIdx, endIdx).replace(/---+\s*$/, '').trim();
             } else if (startIdx !== -1) {
                 quizText = sourceText.substring(startIdx).trim();
@@ -1071,7 +1170,7 @@
         // ---- 保存＆履歴管理 ----
         saveCurrentBtn.addEventListener('click', () => {
             if (!currentData) return;
-            const exists = savedItems.some(item => item.keyword === currentData.keyword && item.level === currentData.level && item.createdAt === currentData.createdAt);
+            const exists = savedItems.some(item => item.keyword === currentData.keyword && item.level === currentData.level && item.itemType === currentData.itemType && item.createdAt === currentData.createdAt);
             if (!exists) {
                 savedItems.unshift(currentData);
                 if (savedItems.length > 20) savedItems.pop();
@@ -1094,10 +1193,13 @@
             savedItems.forEach((item, idx) => {
                 const el = document.createElement('div');
                 el.className = "flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 border border-slate-100 group transition cursor-pointer";
+                const typeLabel = item.itemType === '語彙・言葉' ? '語彙' : '文法';
+                const typeClass = item.itemType === '語彙・言葉' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600';
                 el.innerHTML = `
                     <div class="flex-grow min-w-0" data-idx="${idx}">
                         <div class="flex items-center gap-1.5">
                             <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-700">${item.level}</span>
+                            <span class="text-[10px] font-medium px-1.5 py-0.2 rounded ${typeClass}">${typeLabel}</span>
                             <span class="font-medium text-slate-800 truncate block">${escapeHtml(item.keyword)}</span>
                         </div>
                         <span class="text-[10px] text-slate-400 block">${item.count || 3}件 ｜ ${escapeHtml(item.context || '')}</span>
@@ -1111,6 +1213,7 @@
                 el.querySelector('[data-idx]').addEventListener('click', () => {
                     currentData = savedItems[idx];
                     keywordInput.value = currentData.keyword;
+                    if (currentData.itemType) setItemType(currentData.itemType);
                     jlptLevelSelect.value = currentData.level;
                     if (currentData.context) contextCategorySelect.value = currentData.context;
                     if (currentData.count) sentenceCountSelect.value = currentData.count;
@@ -1150,6 +1253,7 @@
             outputContent.innerHTML = '';
             outputContentContainer.classList.add('hidden');
             activeLevelBadge.classList.add('hidden');
+            if (activeTypeBadge) activeTypeBadge.classList.add('hidden');
             activeKeywordBadge.classList.add('hidden');
             if (activeSourceBadge) activeSourceBadge.classList.add('hidden');
             loadingState.classList.add('hidden');
